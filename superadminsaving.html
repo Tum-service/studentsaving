@@ -39,7 +39,6 @@
 </head>
 <body>
 <div class="container">
-  <!-- Login View -->
   <div id="loginView" class="login-box card">
     <h1>🔐 Super Admin Login</h1>
     <input id="adminPassword" type="password" placeholder="รหัสผ่าน (Default: admin1234)" required>
@@ -47,7 +46,6 @@
     <p id="loginError" style="color:red;margin-top:10px;font-size:0.9rem"></p>
   </div>
 
-  <!-- Admin Dashboard -->
   <div id="adminView" class="hidden">
     <div class="header">
       <h1>📊 ระบบจัดการออมทรัพย์ (Super Admin)</h1>
@@ -72,7 +70,6 @@
         </div>
       </div>
       
-      <!-- Add Transaction Form -->
       <div style="background:#f8fafc;padding:16px;border-radius:8px;margin-bottom:16px;border:1px solid #e2e8f0">
         <h3>➕ เพิ่มรายการใหม่</h3>
         <div class="form-group">
@@ -87,7 +84,6 @@
         <p id="addStatus" style="margin-top:8px;font-size:0.9rem"></p>
       </div>
 
-      <!-- Transactions Table -->
       <div class="table-wrap">
         <table>
           <thead>
@@ -111,7 +107,6 @@
 </div>
 
 <script>
-/* ⚠️ URL ของ Master */
 const MASTER_API = 'https://script.google.com/macros/s/AKfycbyD9mFM97I6uRU48aVB62NRpoFTCwnaV-5qE7efEm5PpiuR1nfv_NcWa7ItYW7AMPJz/exec';
 let adminPassword = '';
 let currentTabName = '';
@@ -120,7 +115,6 @@ function $(id){return document.getElementById(id);}
 function show(id){['loginView','adminView'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
 function fmt(n){return (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
 
-// 🌟 ใช้ JSONP สำหรับ Login
 function login() {
   const pass = $('adminPassword').value;
   if(!pass) return alert('กรุณากรอกรหัสผ่าน');
@@ -161,7 +155,6 @@ function populateStudents(students) {
   });
 }
 
-// 🌟 ใช้ JSONP สำหรับดึงรายการ
 function loadStudentData() {
   const tabName = $('studentSelect').value;
   if(!tabName) return $('txSection').classList.add('hidden');
@@ -215,7 +208,6 @@ function renderTransactions(txList) {
   });
 }
 
-// 🌟 ใช้ fetch แบบ POST สำหรับบันทึก (เลี่ยง CORS ด้วย text/plain)
 async function addTransaction() {
   const date = $('addDate').value;
   const deposit = $('addDeposit').value;
