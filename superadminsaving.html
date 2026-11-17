@@ -111,7 +111,7 @@
 </div>
 
 <script>
-/* ⚠️ URL ของ Master (ตรวจสอบให้แน่ใจว่าเป็นอันล่าสุด) */
+/* ⚠️ URL ของ Master */
 const MASTER_API = 'https://script.google.com/macros/s/AKfycbyD9mFM97I6uRU48aVB62NRpoFTCwnaV-5qE7efEm5PpiuR1nfv_NcWa7ItYW7AMPJz/exec';
 let adminPassword = '';
 let currentTabName = '';
@@ -120,23 +120,31 @@ function $(id){return document.getElementById(id);}
 function show(id){['loginView','adminView'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
 function fmt(n){return (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
 
-async function login(){
+// 🌟 ใช้ JSONP สำหรับ Login
+function login() {
   const pass = $('adminPassword').value;
   if(!pass) return alert('กรุณากรอกรหัสผ่าน');
   
-  try {
-    const res = await fetch(MASTER_API + '?action=getStudentsAdmin&password=' + encodeURIComponent(pass));
-    const json = await res.json();
+  const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
+  window[callbackName] = function(data) {
+    delete window[callbackName];
+    const script = document.getElementById('jsonp_login');
+    if (script) document.body.removeChild(script);
     
-    if(!json.ok) throw new Error(json.error || 'รหัสผ่านไม่ถูกต้อง');
-    
-    adminPassword = pass;
-    localStorage.setItem('admin_pass', pass);
-    show('adminView');
-    populateStudents(json.data);
-  } catch(e) {
-    $('loginError').textContent = e.message;
-  }
+    if(!data.ok) {
+      $('loginError').textContent = data.error || 'รหัสผ่านไม่ถูกต้อง';
+    } else {
+      adminPassword = pass;
+      localStorage.setItem('admin_pass', pass);
+      show('adminView');
+      populateStudents(data.data);
+    }
+  };
+  
+  const script = document.createElement('script');
+  script.id = 'jsonp_login';
+  script.src = MASTER_API + '?action=getStudentsAdmin&password=' + encodeURIComponent(pass) + '&callback=' + callbackName + '&t=' + Date.now();
+  document.body.appendChild(script);
 }
 
 function logout() {
@@ -153,24 +161,32 @@ function populateStudents(students) {
   });
 }
 
-async function loadStudentData() {
+// 🌟 ใช้ JSONP สำหรับดึงรายการ
+function loadStudentData() {
   const tabName = $('studentSelect').value;
   if(!tabName) return $('txSection').classList.add('hidden');
   
   currentTabName = tabName;
-  const url = MASTER_API + '?action=getTransactions&tabName=' + encodeURIComponent(tabName) + '&password=' + encodeURIComponent(adminPassword);
+  const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
   
-  try {
-    const res = await fetch(url);
-    const json = await res.json();
-    if(!json.ok) throw new Error(json.error);
+  window[callbackName] = function(data) {
+    delete window[callbackName];
+    const script = document.getElementById('jsonp_tx');
+    if (script) document.body.removeChild(script);
     
-    renderTransactions(json.data);
-    $('txSection').classList.remove('hidden');
-    $('txTitle').textContent = 'รายการเดินบัญชี: ' + tabName;
-  } catch(e) {
-    alert('โหลดข้อมูลไม่สำเร็จ: ' + e.message);
-  }
+    if(!data.ok) {
+      alert('โหลดข้อมูลไม่สำเร็จ: ' + data.error);
+    } else {
+      renderTransactions(data.data);
+      $('txSection').classList.remove('hidden');
+      $('txTitle').textContent = 'รายการเดินบัญชี: ' + tabName;
+    }
+  };
+  
+  const script = document.createElement('script');
+  script.id = 'jsonp_tx';
+  script.src = MASTER_API + '?action=getTransactions&tabName=' + encodeURIComponent(tabName) + '&password=' + encodeURIComponent(adminPassword) + '&callback=' + callbackName + '&t=' + Date.now();
+  document.body.appendChild(script);
 }
 
 function renderTransactions(txList) {
@@ -199,6 +215,7 @@ function renderTransactions(txList) {
   });
 }
 
+// 🌟 ใช้ fetch แบบ POST สำหรับบันทึก (เลี่ยง CORS ด้วย text/plain)
 async function addTransaction() {
   const date = $('addDate').value;
   const deposit = $('addDeposit').value;
@@ -211,30 +228,21 @@ async function addTransaction() {
   if(!deposit && !withdraw && !transfer) return alert('กรุณากรอกยอดเงินอย่างน้อย 1 ช่อง');
 
   const payload = {
-    action: 'addTransaction',
-    password: adminPassword,
-    tabName: currentTabName,
-    date: date,
-    deposit: Number(deposit) || 0,
-    withdraw: Number(withdraw) || 0,
-    transfer: Number(transfer) || 0,
-    by: by,
-    note: note
+    action: 'addTransaction', password: adminPassword, tabName: currentTabName,
+    date: date, deposit: Number(deposit) || 0, withdraw: Number(withdraw) || 0,
+    transfer: Number(transfer) || 0, by: by, note: note
   };
 
   try {
     const res = await fetch(MASTER_API, {
-      method: 'POST',
-      body: JSON.stringify(payload),
+      method: 'POST', body: JSON.stringify(payload),
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }
     });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
     
     $('addStatus').innerHTML = '<span class="status status-ok">✅ บันทึกสำเร็จ! (ระบบกำลังสร้าง PDF ใหม่)</span>';
-    $('addDeposit').value = ''; $('addWithdraw').value = ''; $('addTransfer').value = '';
-    $('addNote').value = '';
-    
+    $('addDeposit').value = ''; $('addWithdraw').value = ''; $('addTransfer').value = ''; $('addNote').value = '';
     loadStudentData();
   } catch(e) {
     $('addStatus').innerHTML = '<span class="status status-err">❌ ' + e.message + '</span>';
@@ -242,60 +250,44 @@ async function addTransaction() {
 }
 
 async function deleteTx(rowIndex) {
-  if(!confirm('ยืนยันการลบรายการนี้? (ระบบจะคำนวณยอดคงเหลือใหม่ทั้งหมด)')) return;
-  
-  const payload = {
-    action: 'deleteTransaction',
-    password: adminPassword,
-    tabName: currentTabName,
-    rowIndex: rowIndex
-  };
-  
+  if(!confirm('ยืนยันการลบรายการนี้?')) return;
+  const payload = { action: 'deleteTransaction', password: adminPassword, tabName: currentTabName, rowIndex: rowIndex };
   try {
     const res = await fetch(MASTER_API, { 
-      method: 'POST', 
-      body: JSON.stringify(payload),
+      method: 'POST', body: JSON.stringify(payload),
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }
     });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
     loadStudentData();
-  } catch(e) {
-    alert('ลบไม่สำเร็จ: ' + e.message);
-  }
+  } catch(e) { alert('ลบไม่สำเร็จ: ' + e.message); }
 }
 
 async function regeneratePdf() {
   const payload = { action: 'regeneratePdf', password: adminPassword, tabName: currentTabName };
   try {
     const res = await fetch(MASTER_API, { 
-      method: 'POST', 
-      body: JSON.stringify(payload),
+      method: 'POST', body: JSON.stringify(payload),
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }
     });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
     alert('✅ อัปเดต PDF เรียบร้อยแล้ว');
-  } catch(e) {
-    alert('อัปเดต PDF ไม่สำเร็จ: ' + e.message);
-  }
+  } catch(e) { alert('อัปเดต PDF ไม่สำเร็จ: ' + e.message); }
 }
 
 async function syncTabs() {
   const payload = { action: 'syncNow', password: adminPassword };
   try {
     const res = await fetch(MASTER_API, { 
-      method: 'POST', 
-      body: JSON.stringify(payload),
+      method: 'POST', body: JSON.stringify(payload),
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }
     });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
     alert('✅ Sync ข้อมูลแท็บใหม่เรียบร้อยแล้ว');
     login();
-  } catch(e) {
-    alert('Sync ไม่สำเร็จ: ' + e.message);
-  }
+  } catch(e) { alert('Sync ไม่สำเร็จ: ' + e.message); }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
