@@ -107,7 +107,6 @@
 </div>
 
 <script>
-// ⚠️ URL ของ Master (ตรวจสอบให้แน่ใจว่าตรงกับที่ Deploy ล่าสุด)
 const MASTER_API = 'https://script.google.com/macros/s/AKfycbyD9mFM97I6uRU48aVB62NRpoFTCwnaV-5qE7efEm5PpiuR1nfv_NcWa7ItYW7AMPJz/exec';
 let adminPassword = '';
 let currentTabName = '';
@@ -146,7 +145,7 @@ function login() {
   script.onerror = function() {
     delete window[callbackName];
     if (script) document.body.removeChild(script);
-    $('loginError').textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (URL อาจผิดหรือยังไม่ Deploy)';
+    $('loginError').textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (กรุณา Deploy Master เป็น New version)';
   };
   
   document.body.appendChild(script);
