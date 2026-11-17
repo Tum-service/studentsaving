@@ -26,7 +26,7 @@
     border-radius:12px;
     margin-bottom:16px;
     border-left:6px solid #d97706;
-    text-align: center; /* จัดกึ่งกลาง */
+    text-align: center;
   }
   .book-header h2{color:#92400e;margin-bottom:6px;font-size:1.15rem;line-height: 1.4;}
   .book-header p{color:#78350f;font-size:.95rem;margin:2px 0}
@@ -77,19 +77,19 @@
     /* ปรับตารางให้พอดีหน้าจอ */
     table { 
       font-size: 0.7rem; 
-      table-layout: fixed; /* ล็อคความกว้างคอลัมน์ */
+      table-layout: fixed; 
       width: 100%;
     }
     
-    /* กำหนดความกว้างของแต่ละคอลัมน์บนมือถือ เพื่อไม่ให้ทับซ้อน */
+    /* กำหนดความกว้างของแต่ละคอลัมน์บนมือถือ */
     th:nth-child(1) { width: 20%; } /* วันที่ */
     th:nth-child(3) { width: 15%; } /* ยอดยกมา */
     th:nth-child(4) { width: 15%; } /* ฝาก */
     th:nth-child(5) { width: 10%; } /* ถอน */
-    th:nth-child(6) { width: 20%; } /* จำนวนคงเหลือ */
+    th:nth-child(6) { width: 20%; } /* คงเหลือ */
     th:nth-child(9) { width: 20%; } /* โอนให้นักเรียน */
 
-    /* หัวตาราง: อนุญาตให้ตัดขึ้นบรรทัดใหม่ได้ */
+    /* หัวตาราง: จัดกึ่งกลาง และอนุญาตให้ตัดขึ้นบรรทัดใหม่ */
     th {
       white-space: normal; 
       text-align: center;
@@ -99,15 +99,15 @@
       line-height: 1.2;
     }
     
-    /* ข้อมูลในตาราง */
+    /* ข้อมูลในตาราง: จัดกึ่งกลาง */
     td {
       padding: 8px 2px;
-      text-align: center; /* จัดกึ่งกลางทั้งหมด */
+      text-align: center; 
       vertical-align: middle;
       font-size: 0.7rem;
     }
     
-    /* ตัวเลขและเครื่องหมาย - ไม่ให้ตกบรรทัด */
+    /* ตัวเลขและเครื่องหมาย - จัดกึ่งกลาง ไม่ตกบรรทัด */
     .num {
       text-align: center !important; 
       white-space: nowrap; 
@@ -156,13 +156,13 @@
             <tr>
               <th>วันที่ออม</th>
               <th>ชื่อนักเรียน</th>
-              <th class="num">ยอดยกมา</th>
+              <th class="num">ยอด<br>ยกมา</th>
               <th class="num">ฝาก</th>
               <th class="num">ถอน</th>
-              <th class="num">จำนวนคงเหลือ</th>
+              <th class="num">คงเหลือ</th>
               <th>ผู้รับฝาก</th>
               <th>หมายเหตุ</th>
-              <th class="num">โอนให้นักเรียน</th>
+              <th class="num">โอนให้<br>นักเรียน</th>
             </tr>
           </thead>
           <tbody id="txBody"></tbody>
@@ -176,14 +176,18 @@
 const TENANT_API = 'https://script.google.com/macros/s/AKfycbzekZKZZd9WBVdNi6HXgzvZYkDfC1v2arTwOIE72oQxOf8hgKgCGUCVFYhQynO5SQkz2A/exec';
 
 function $(id){return document.getElementById(id);}
-function fmt(n){return (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
 
-// แก้ไขฟังก์ชันวันที่ให้แสดง พ.ศ. 2 หลัก
+// ปรับการแสดงผลตัวเลข: ไม่เอาจุดทศนิยม (.00)
+function fmt(n){
+  return (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:0, maximumFractionDigits:0});
+}
+
+// แสดงวันที่เป็น พ.ศ. 2 หลัก
 function fmtDate(d){
   if(!d)return '';
   const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(!m)return d;
-  const y = String(parseInt(m[1]) + 543).slice(-2); // เอาแค่ 2 หลักท้าย
+  const y = String(parseInt(m[1]) + 543).slice(-2); 
   return m[3]+'/'+m[2]+'/'+y;
 }
 
