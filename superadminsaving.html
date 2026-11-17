@@ -11,6 +11,8 @@
   .container{max-width:1400px;margin:0 auto;padding:16px}
   .card{background:#fff;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,.1);padding:20px;margin-bottom:16px}
   h1{font-size:1.3rem;color:#1e293b;margin-bottom:12px}
+  h2{font-size:1.1rem;color:#334155;margin-bottom:12px}
+  h3{font-size:1rem;color:#475569;margin-bottom:8px}
   .login-box{max-width:400px;margin:100px auto;text-align:center}
   input,select,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-family:inherit;font-size:0.95rem;margin-bottom:10px}
   button{background:#1e293b;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit}
@@ -19,6 +21,8 @@
   .btn-red:hover{background:#b91c1c}
   .btn-green{background:#059669}
   .btn-green:hover{background:#047857}
+  .btn-blue{background:#2563eb}
+  .btn-blue:hover{background:#1d4ed8}
   .hidden{display:none!important}
   .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
   .table-wrap{overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px}
@@ -54,7 +58,9 @@
       <h2>เลือกผู้ฝาก / เพิ่มข้อมูล</h2>
       <div class="form-group">
         <select id="studentSelect" onchange="loadStudentData()"></select>
-        <button class="btn-green" onclick="syncTabs()">🔄 Sync แท็บใหม่ / สร้างโฟลเดอร์</button>
+        <div style="display:flex;gap:10px">
+            <button class="btn-green" style="flex:1" onclick="syncTabs()">🔄 Sync สร้างโฟลเดอร์/ไฟล์ใหม่</button>
+        </div>
       </div>
     </div>
 
@@ -62,12 +68,12 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <h2 id="txTitle">รายการเดินบัญชี</h2>
         <div>
-          <button class="btn-outline" onclick="regeneratePdf()">📄 อัปเดต PDF ทันที</button>
+          <button class="btn-blue" onclick="regeneratePdf()">📄 อัปเดต PDF ทันที</button>
         </div>
       </div>
       
       <!-- Add Transaction Form -->
-      <div style="background:#f8fafc;padding:16px;border-radius:8px;margin-bottom:16px">
+      <div style="background:#f8fafc;padding:16px;border-radius:8px;margin-bottom:16px;border:1px solid #e2e8f0">
         <h3>➕ เพิ่มรายการใหม่</h3>
         <div class="form-group">
           <input type="date" id="addDate" required>
@@ -105,8 +111,8 @@
 </div>
 
 <script>
-/* ⚠️ วาง URL ของ backend_saving_master ที่ Deploy แล้วตรงนี้ */
-const MASTER_API = 'https://script.google.com/macros/s/YOUR_MASTER_DEPLOY_ID/exec';
+// URL ของ Master ที่คุณให้มา
+const MASTER_API = 'https://script.google.com/macros/s/AKfycbwUEz0s2i9SQQ6hWVUpg0mIr8Oq-4ckJxhYR_vuy5sVwG6tyBMiMsQhu2ki03F3ceF3/exec';
 let adminPassword = '';
 let currentTabName = '';
 
@@ -170,6 +176,10 @@ async function loadStudentData() {
 function renderTransactions(txList) {
   const tbody = $('txBody');
   tbody.innerHTML = '';
+  if(!txList || txList.length === 0){
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px">ยังไม่มีรายการ</td></tr>';
+    return;
+  }
   txList.forEach(tx => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -213,9 +223,11 @@ async function addTransaction() {
   };
 
   try {
+    // ใช้ text/plain ในการส่ง JSON เพื่อหลีกเลี่ยงปัญหา CORS Preflight
     const res = await fetch(MASTER_API, {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
     });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
@@ -241,7 +253,11 @@ async function deleteTx(rowIndex) {
   };
   
   try {
-    const res = await fetch(MASTER_API, { method: 'POST', body: JSON.stringify(payload) });
+    const res = await fetch(MASTER_API, { 
+      method: 'POST', 
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
     loadStudentData();
@@ -253,7 +269,11 @@ async function deleteTx(rowIndex) {
 async function regeneratePdf() {
   const payload = { action: 'regeneratePdf', password: adminPassword, tabName: currentTabName };
   try {
-    const res = await fetch(MASTER_API, { method: 'POST', body: JSON.stringify(payload) });
+    const res = await fetch(MASTER_API, { 
+      method: 'POST', 
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
     alert('✅ อัปเดต PDF เรียบร้อยแล้ว');
@@ -265,7 +285,11 @@ async function regeneratePdf() {
 async function syncTabs() {
   const payload = { action: 'syncNow', password: adminPassword };
   try {
-    const res = await fetch(MASTER_API, { method: 'POST', body: JSON.stringify(payload) });
+    const res = await fetch(MASTER_API, { 
+      method: 'POST', 
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error);
     alert('✅ Sync ข้อมูลแท็บใหม่เรียบร้อยแล้ว');
