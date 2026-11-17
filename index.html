@@ -65,7 +65,7 @@
   
   /* Mobile Responsive */
   @media (max-width: 768px) {
-    .card { padding: 12px; }
+    .card { padding: 10px; }
     
     /* ซ่อนคอลัมน์: ชื่อนักเรียน (2), ผู้รับฝาก (7), หมายเหตุ (8) */
     th:nth-child(2), td:nth-child(2),
@@ -76,28 +76,46 @@
     
     /* ปรับตารางให้พอดีหน้าจอ */
     table { 
-      font-size: 0.75rem; 
-      table-layout: fixed; 
+      font-size: 0.7rem; 
+      table-layout: fixed; /* ล็อคความกว้างคอลัมน์ */
       width: 100%;
     }
     
-    /* จัดให้ทุกคอลัมน์อยู่กึ่งกลาง */
-    th, td {
-      padding: 8px 2px;
-      text-align: center; /* จัดกึ่งกลางทั้งหมด */
+    /* กำหนดความกว้างของแต่ละคอลัมน์บนมือถือ เพื่อไม่ให้ทับซ้อน */
+    th:nth-child(1) { width: 20%; } /* วันที่ */
+    th:nth-child(3) { width: 15%; } /* ยอดยกมา */
+    th:nth-child(4) { width: 15%; } /* ฝาก */
+    th:nth-child(5) { width: 10%; } /* ถอน */
+    th:nth-child(6) { width: 20%; } /* จำนวนคงเหลือ */
+    th:nth-child(9) { width: 20%; } /* โอนให้นักเรียน */
+
+    /* หัวตาราง: อนุญาตให้ตัดขึ้นบรรทัดใหม่ได้ */
+    th {
+      white-space: normal; 
+      text-align: center;
+      vertical-align: middle;
+      padding: 6px 2px;
+      font-size: 0.65rem;
+      line-height: 1.2;
     }
     
-    /* บังคับให้ตัวเลขและเครื่องหมาย - อยู่กึ่งกลางบนมือถือ */
+    /* ข้อมูลในตาราง */
+    td {
+      padding: 8px 2px;
+      text-align: center; /* จัดกึ่งกลางทั้งหมด */
+      vertical-align: middle;
+      font-size: 0.7rem;
+    }
+    
+    /* ตัวเลขและเครื่องหมาย - ไม่ให้ตกบรรทัด */
     .num {
       text-align: center !important; 
+      white-space: nowrap; 
     }
 
-    th { font-size: 0.75rem; }
-
-    /* คอลัมน์วันที่ (คอลัมน์ที่ 1) ห้ามตกบรรทัด */
+    /* คอลัมน์วันที่ ห้ามตกบรรทัด */
     td:nth-child(1) {
       white-space: nowrap;
-      font-size: 0.7rem; /* ปรับขนาดให้เล็กลงเล็กน้อยเพื่อให้พอดี */
     }
   }
 
@@ -126,7 +144,6 @@
 
   <div id="dataView" class="hidden">
     <div class="card">
-      <!-- ปรับโครงสร้าง Header ใหม่ -->
       <div class="book-header">
         <h2 id="studentTitle">สมุดฝากออมทรัพย์</h2>
         <p id="studentSchool">โรงเรียนบ้านถิ่นสำราญ</p>
@@ -160,13 +177,16 @@ const TENANT_API = 'https://script.google.com/macros/s/AKfycbzekZKZZd9WBVdNi6HXg
 
 function $(id){return document.getElementById(id);}
 function fmt(n){return (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+// แก้ไขฟังก์ชันวันที่ให้แสดง พ.ศ. 2 หลัก
 function fmtDate(d){
   if(!d)return '';
   const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(!m)return d;
-  const y=parseInt(m[1])+543;
+  const y = String(parseInt(m[1]) + 543).slice(-2); // เอาแค่ 2 หลักท้าย
   return m[3]+'/'+m[2]+'/'+y;
 }
+
 function show(id){['loginView','loadingView','dataView'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
 
 function loadData(name) {
@@ -202,7 +222,6 @@ function loadData(name) {
 }
 
 function renderStudent(d){
-  // ปรับการแสดงผล Header: ชื่อขึ้นบรรทัดใหม่ และอยู่กึ่งกลาง
   $('studentTitle').innerHTML = 'สมุดฝากออมทรัพย์<br><span style="font-size:1.1em; color:#78350f;">' + escapeHtml(d.studentName) + '</span>';
   $('studentSchool').textContent = d.schoolName || '';
   
