@@ -50,7 +50,6 @@
 </head>
 <body>
 <div class="container">
-
   <div id="loginView" class="card">
     <h1>🏦 สมุดออมทรัพย์นักเรียน</h1>
     <p class="sub">พิมพ์ชื่อเล่นหรือชื่อที่ตรงกับชีทออมทรัพย์ของคุณ (เช่น สกาย)</p>
@@ -73,7 +72,6 @@
         <p id="studentSchool">โรงเรียนบ้านถิ่นสำราญ</p>
         <p id="studentYear">ปีการศึกษา 2569 - 2570</p>
       </div>
-
       <div class="table-wrap">
         <table>
           <thead>
@@ -92,29 +90,23 @@
           <tbody id="txBody"></tbody>
         </table>
       </div>
-
       <div class="summary">
         <div class="stat dep"><div class="label">ฝากรวม</div><div class="value" id="sumDep">0</div></div>
         <div class="stat wd"><div class="label">ถอนรวม</div><div class="value" id="sumWd">0</div></div>
         <div class="stat tr"><div class="label">โอนรวม</div><div class="value" id="sumTr">0</div></div>
         <div class="stat bal"><div class="label">คงเหลือ</div><div class="value" id="sumBal">0</div></div>
       </div>
-
       <div class="actions">
         <button class="btn-outline" id="pdfBtn" type="button">📄 ดาวน์โหลด PDF</button>
         <button class="logout" id="logoutBtn" type="button">🚪 ออกจากระบบ</button>
       </div>
     </div>
   </div>
-
 </div>
 
 <script>
-/* ============================================================
- *  ⚠️ วาง URL ของ backend_saving_tenant ที่ deploy แล้วตรงนี้
- * ============================================================ */
+/* ⚠️ วาง URL ของ backend_saving_tenant ที่ Deploy แล้วตรงนี้ */
 const TENANT_API = 'https://script.google.com/macros/s/YOUR_TENANT_DEPLOY_ID/exec';
-
 const LS_KEY = 'saving_viewer_session_v1';
 let currentPdfUrl = '';
 
