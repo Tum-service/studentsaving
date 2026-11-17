@@ -18,15 +18,24 @@
   button:disabled{opacity:.6;cursor:not-allowed}
   .error{color:#c62828;font-size:.9rem;margin-top:8px;min-height:20px}
   .hidden{display:none!important}
-  .book-header{background:linear-gradient(135deg,#fef3c7,#fde68a);padding:20px;border-radius:12px;margin-bottom:16px;border-left:6px solid #d97706}
-  .book-header h2{color:#92400e;margin-bottom:6px;font-size:1.15rem}
+  
+  /* ปรับ Header ให้อยู่กึ่งกลาง */
+  .book-header{
+    background:linear-gradient(135deg,#fef3c7,#fde68a);
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:16px;
+    border-left:6px solid #d97706;
+    text-align: center; /* จัดกึ่งกลาง */
+  }
+  .book-header h2{color:#92400e;margin-bottom:6px;font-size:1.15rem;line-height: 1.4;}
   .book-header p{color:#78350f;font-size:.95rem;margin:2px 0}
   
   /* ปรับแต่งตารางให้เลื่อนและตรึงหัวตาราง */
   .table-wrap{
     overflow-x:auto; 
     overflow-y:auto; 
-    max-height:65vh; /* กำหนดความสูงให้เลื่อนได้ */
+    max-height:65vh;
     border-radius:12px;
     border:1px solid #e5e7eb;
     margin-bottom:16px;
@@ -39,9 +48,9 @@
     font-weight:600;
     white-space:nowrap;
     font-size:.85rem;
-    position:sticky; /* ตรึงหัวตาราง */
+    position:sticky;
     top:0;
-    background:#4a3f8f; /* ต้องมี background ทึบเพื่อไม่ให้ทะลุ */
+    background:#4a3f8f;
     z-index:10;
   }
   td{padding:8px;border-bottom:1px solid #f0f0f0;white-space:nowrap}
@@ -68,25 +77,34 @@
     /* ปรับตารางให้พอดีหน้าจอ */
     table { 
       font-size: 0.75rem; 
-      table-layout: fixed; /* ล็อคความกว้างคอลัมน์ให้พอดี */
+      table-layout: fixed; 
       width: 100%;
     }
+    
+    /* จัดให้ทุกคอลัมน์อยู่กึ่งกลาง */
     th, td {
-      padding: 6px 2px;
-      white-space: normal; /* อนุญาตให้ข้อความตัดบรรทัดได้ */
-      word-break: break-word;
-      text-align: center;
+      padding: 8px 2px;
+      text-align: center; /* จัดกึ่งกลางทั้งหมด */
     }
+    
+    /* บังคับให้ตัวเลขและเครื่องหมาย - อยู่กึ่งกลางบนมือถือ */
     .num {
-      text-align: right;
+      text-align: center !important; 
     }
-    th { font-size: 0.7rem; }
+
+    th { font-size: 0.75rem; }
+
+    /* คอลัมน์วันที่ (คอลัมน์ที่ 1) ห้ามตกบรรทัด */
+    td:nth-child(1) {
+      white-space: nowrap;
+      font-size: 0.7rem; /* ปรับขนาดให้เล็กลงเล็กน้อยเพื่อให้พอดี */
+    }
   }
 
   @media print{
     body{background:#fff;padding:0}
     .card{box-shadow:none;padding:0}
-    .table-wrap{max-height:none;overflow:visible} /* ให้พิมพ์ได้ครบทุกหน้า */
+    .table-wrap{max-height:none;overflow:visible}
   }
 </style>
 </head>
@@ -108,11 +126,10 @@
 
   <div id="dataView" class="hidden">
     <div class="card">
+      <!-- ปรับโครงสร้าง Header ใหม่ -->
       <div class="book-header">
         <h2 id="studentTitle">สมุดฝากออมทรัพย์</h2>
-        <p id="studentClass">ชั้นประถมศึกษาปีที่ 6</p>
         <p id="studentSchool">โรงเรียนบ้านถิ่นสำราญ</p>
-        <p id="studentYear">ปีการศึกษา 2569 - 2570</p>
       </div>
       
       <!-- ตารางข้อมูล -->
@@ -134,9 +151,6 @@
           <tbody id="txBody"></tbody>
         </table>
       </div>
-
-      <!-- ลบปุ่ม Action ทั้งหมดออกแล้ว -->
-
     </div>
   </div>
 </div>
@@ -188,10 +202,9 @@ function loadData(name) {
 }
 
 function renderStudent(d){
-  $('studentTitle').textContent='สมุดฝากออมทรัพย์ ของ '+d.studentName;
-  $('studentClass').textContent=d.className||'';
-  $('studentSchool').textContent=d.schoolName||'';
-  $('studentYear').textContent=d.year||'';
+  // ปรับการแสดงผล Header: ชื่อขึ้นบรรทัดใหม่ และอยู่กึ่งกลาง
+  $('studentTitle').innerHTML = 'สมุดฝากออมทรัพย์<br><span style="font-size:1.1em; color:#78350f;">' + escapeHtml(d.studentName) + '</span>';
+  $('studentSchool').textContent = d.schoolName || '';
   
   const tbody=$('txBody');
   tbody.innerHTML='';
@@ -200,7 +213,7 @@ function renderStudent(d){
     tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#999;padding:24px">ยังไม่มีรายการ</td></tr>';
   }else{
     d.transactions.forEach(tx=>{
-      // ลบแถวที่เป็น "รวมทั้งหมด" ออก (ถ้ามีข้อมูลส่งมา)
+      // ลบแถวที่เป็น "รวมทั้งหมด" ออก
       if (String(tx.date).includes('รวม') || String(tx.student).includes('รวม')) return;
 
       const tr=document.createElement('tr');
@@ -218,13 +231,13 @@ function renderStudent(d){
     });
   }
 
-  // Auto Scroll ลงไปที่แถวล่าสุด (ด้านล่างสุด) หลังจากตารางโหลดเสร็จ
+  // Auto Scroll ลงไปที่แถวล่าสุด
   setTimeout(() => {
     const tableWrap = document.getElementById('tableWrap');
     if (tableWrap) {
       tableWrap.scrollTop = tableWrap.scrollHeight;
     }
-  }, 150); // หน่วงเวลาเล็กน้อยเพื่อให้ DOM วาดเสร็จ
+  }, 150); 
 }
 
 function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
