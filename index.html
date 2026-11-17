@@ -105,7 +105,6 @@
 </div>
 
 <script>
-/* ⚠️ URL ของ Tenant */
 const TENANT_API = 'https://script.google.com/macros/s/AKfycbzekZKZZd9WBVdNi6HXgzvZYkDfC1v2arTwOIE72oQxOf8hgKgCGUCVFYhQynO5SQkz2A/exec';
 let currentPdfUrl = '';
 
@@ -120,7 +119,6 @@ function fmtDate(d){
 }
 function show(id){['loginView','loadingView','dataView'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
 
-// 🌟 ใช้ JSONP ในการดึงข้อมูล
 function loadData(name) {
   show('loadingView');
   const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
