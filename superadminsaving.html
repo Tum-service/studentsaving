@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Admin - จัดการออมทรัพย์</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Sarabun',sans-serif;background:#f3f4f6;color:#222}
+  .container{max-width:1400px;margin:0 auto;padding:16px}
+  .card{background:#fff;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,.1);padding:20px;margin-bottom:16px}
+  h1{font-size:1.3rem;color:#1e293b;margin-bottom:12px}
+  .login-box{max-width:400px;margin:100px auto;text-align:center}
+  input,select,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-family:inherit;font-size:0.95rem;margin-bottom:10px}
+  button{background:#1e293b;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit}
+  button:hover{background:#334155}
+  .btn-red{background:#dc2626}
+  .btn-red:hover{background:#b91c1c}
+  .btn-green{background:#059669}
+  .btn-green:hover{background:#047857}
+  .hidden{display:none!important}
+  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .table-wrap{overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px}
+  table{width:100%;border-collapse:collapse;font-size:0.9rem}
+  th,td{padding:10px;text-align:left;border-bottom:1px solid #e2e8f0}
+  th{background:#f8fafc;font-weight:600}
+  tr:hover{background:#f1f5f9}
+  .form-group{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .form-group.full{grid-template-columns:1fr}
+  .status{font-weight:bold;padding:4px 8px;border-radius:4px;font-size:0.8rem}
+  .status-ok{background:#d1fae5;color:#065f46}
+  .status-err{background:#fee2e2;color:#991b1b}
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- Login View -->
+  <div id="loginView" class="login-box card">
+    <h1>🔐 Super Admin Login</h1>
+    <input id="adminPassword" type="password" placeholder="รหัสผ่าน (Default: admin1234)" required>
+    <button onclick="login()">เข้าสู่ระบบ</button>
+    <p id="loginError" style="color:red;margin-top:10px;font-size:0.9rem"></p>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div id="adminView" class="hidden">
+    <div class="header">
+      <h1>📊 ระบบจัดการออมทรัพย์ (Super Admin)</h1>
+      <button class="btn-red" onclick="logout()">ออกจากระบบ</button>
+    </div>
+
+    <div class="card">
+      <h2>เลือกผู้ฝาก / เพิ่มข้อมูล</h2>
+      <div class="form-group">
+        <select id="studentSelect" onchange="loadStudentData()"></select>
+        <button class="btn-green" onclick="syncTabs()">🔄 Sync แท็บใหม่ / สร้างโฟลเดอร์</button>
+      </div>
+    </div>
+
+    <div id="txSection" class="card hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 id="txTitle">รายการเดินบัญชี</h2>
+        <div>
+          <button class="btn-outline" onclick="regeneratePdf()">📄 อัปเดต PDF ทันที</button>
+        </div>
+      </div>
+      
+      <!-- Add Transaction Form -->
+      <div style="background:#f8fafc;padding:16px;border-radius:8px;margin-bottom:16px">
+        <h3>➕ เพิ่มรายการใหม่</h3>
+        <div class="form-group">
+          <input type="date" id="addDate" required>
+          <input type="number" id="addDeposit" placeholder="ฝาก (บาท)" step="0.01">
+          <input type="number" id="addWithdraw" placeholder="ถอน (บาท)" step="0.01">
+          <input type="number" id="addTransfer" placeholder="โอนให้นักเรียน (บาท)" step="0.01">
+          <input type="text" id="addBy" placeholder="ผู้รับฝาก">
+          <input type="text" id="addNote" placeholder="หมายเหตุ">
+        </div>
+        <button class="btn-green" onclick="addTransaction()">บันทึกรายการ</button>
+        <p id="addStatus" style="margin-top:8px;font-size:0.9rem"></p>
+      </div>
+
+      <!-- Transactions Table -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>วันที่</th>
+              <th class="num">ยอดยกมา</th>
+              <th class="num">ฝาก</th>
+              <th class="num">ถอน</th>
+              <th class="num">โอน</th>
+              <th class="num">คงเหลือ</th>
+              <th>ผู้รับฝาก</th>
+              <th>หมายเหตุ</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="txBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ⚠️ วาง URL ของ backend_saving_master ที่ Deploy แล้วตรงนี้ */
+const MASTER_API = 'https://script.google.com/macros/s/YOUR_MASTER_DEPLOY_ID/exec';
+let adminPassword = '';
+let currentTabName = '';
+
+function $(id){return document.getElementById(id);}
+function show(id){['loginView','adminView'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
+function fmt(n){return (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+async function login(){
+  const pass = $('adminPassword').value;
+  if(!pass) return alert('กรุณากรอกรหัสผ่าน');
+  
+  try {
+    const res = await fetch(MASTER_API + '?action=getStudentsAdmin&password=' + encodeURIComponent(pass));
+    const json = await res.json();
+    
+    if(!json.ok) throw new Error(json.error || 'รหัสผ่านไม่ถูกต้อง');
+    
+    adminPassword = pass;
+    localStorage.setItem('admin_pass', pass);
+    show('adminView');
+    populateStudents(json.data);
+  } catch(e) {
+    $('loginError').textContent = e.message;
+  }
+}
+
+function logout() {
+  localStorage.removeItem('admin_pass');
+  show('loginView');
+  $('adminPassword').value = '';
+}
+
+function populateStudents(students) {
+  const sel = $('studentSelect');
+  sel.innerHTML = '<option value="">-- เลือกนักเรียน --</option>';
+  students.forEach(s => {
+    sel.innerHTML += `<option value="${s.tabName}">${s.fullName} (${s.tabName})</option>`;
+  });
+}
+
+async function loadStudentData() {
+  const tabName = $('studentSelect').value;
+  if(!tabName) return $('txSection').classList.add('hidden');
+  
+  currentTabName = tabName;
+  const url = MASTER_API + '?action=getTransactions&tabName=' + encodeURIComponent(tabName) + '&password=' + encodeURIComponent(adminPassword);
+  
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error);
+    
+    renderTransactions(json.data);
+    $('txSection').classList.remove('hidden');
+    $('txTitle').textContent = 'รายการเดินบัญชี: ' + tabName;
+  } catch(e) {
+    alert('โหลดข้อมูลไม่สำเร็จ: ' + e.message);
+  }
+}
+
+function renderTransactions(txList) {
+  const tbody = $('txBody');
+  tbody.innerHTML = '';
+  txList.forEach(tx => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${tx.date}</td>
+      <td class="num">${fmt(tx.carry)}</td>
+      <td class="num" style="color:#059669">${tx.deposit ? fmt(tx.deposit) : '-'}</td>
+      <td class="num" style="color:#dc2626">${tx.withdraw ? fmt(tx.withdraw) : '-'}</td>
+      <td class="num" style="color:#d97706">${tx.transfer ? fmt(tx.transfer) : '-'}</td>
+      <td class="num"><b>${fmt(tx.balance)}</b></td>
+      <td>${tx.by || ''}</td>
+      <td>${tx.note || ''}</td>
+      <td>
+        <button class="btn-red" style="padding:4px 8px;font-size:0.8rem" onclick="deleteTx(${tx.rowIndex})">ลบ</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function addTransaction() {
+  const date = $('addDate').value;
+  const deposit = $('addDeposit').value;
+  const withdraw = $('addWithdraw').value;
+  const transfer = $('addTransfer').value;
+  const by = $('addBy').value;
+  const note = $('addNote').value;
+
+  if(!date) return alert('กรุณาระบุวันที่');
+  if(!deposit && !withdraw && !transfer) return alert('กรุณากรอกยอดเงินอย่างน้อย 1 ช่อง');
+
+  const payload = {
+    action: 'addTransaction',
+    password: adminPassword,
+    tabName: currentTabName,
+    date: date,
+    deposit: Number(deposit) || 0,
+    withdraw: Number(withdraw) || 0,
+    transfer: Number(transfer) || 0,
+    by: by,
+    note: note
+  };
+
+  try {
+    const res = await fetch(MASTER_API, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error);
+    
+    $('addStatus').innerHTML = '<span class="status status-ok">✅ บันทึกสำเร็จ! (ระบบกำลังสร้าง PDF ใหม่)</span>';
+    $('addDeposit').value = ''; $('addWithdraw').value = ''; $('addTransfer').value = '';
+    $('addNote').value = '';
+    
+    loadStudentData(); // Refresh table
+  } catch(e) {
+    $('addStatus').innerHTML = '<span class="status status-err">❌ ' + e.message + '</span>';
+  }
+}
+
+async function deleteTx(rowIndex) {
+  if(!confirm('ยืนยันการลบรายการนี้? (ระบบจะคำนวณยอดคงเหลือใหม่ทั้งหมด)')) return;
+  
+  const payload = {
+    action: 'deleteTransaction',
+    password: adminPassword,
+    tabName: currentTabName,
+    rowIndex: rowIndex
+  };
+  
+  try {
+    const res = await fetch(MASTER_API, { method: 'POST', body: JSON.stringify(payload) });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error);
+    loadStudentData();
+  } catch(e) {
+    alert('ลบไม่สำเร็จ: ' + e.message);
+  }
+}
+
+async function regeneratePdf() {
+  const payload = { action: 'regeneratePdf', password: adminPassword, tabName: currentTabName };
+  try {
+    const res = await fetch(MASTER_API, { method: 'POST', body: JSON.stringify(payload) });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error);
+    alert('✅ อัปเดต PDF เรียบร้อยแล้ว');
+  } catch(e) {
+    alert('อัปเดต PDF ไม่สำเร็จ: ' + e.message);
+  }
+}
+
+async function syncTabs() {
+  const payload = { action: 'syncNow', password: adminPassword };
+  try {
+    const res = await fetch(MASTER_API, { method: 'POST', body: JSON.stringify(payload) });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error);
+    alert('✅ Sync ข้อมูลแท็บใหม่เรียบร้อยแล้ว');
+    login(); // Refresh student list
+  } catch(e) {
+    alert('Sync ไม่สำเร็จ: ' + e.message);
+  }
+}
+
+// Auto login
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('admin_pass');
+  if(saved) { $('adminPassword').value = saved; login(); }
+  $('addDate').value = new Date().toISOString().split('T')[0];
+});
+</script>
+</body>
+</html>
