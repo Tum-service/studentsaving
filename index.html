@@ -21,16 +21,34 @@
   .book-header{background:linear-gradient(135deg,#fef3c7,#fde68a);padding:20px;border-radius:12px;margin-bottom:16px;border-left:6px solid #d97706}
   .book-header h2{color:#92400e;margin-bottom:6px;font-size:1.15rem}
   .book-header p{color:#78350f;font-size:.95rem;margin:2px 0}
-  .table-wrap{overflow-x:auto;border-radius:12px;border:1px solid #e5e7eb;margin-bottom:16px}
+  
+  /* ปรับแต่งตารางให้เลื่อนและตรึงหัวตาราง */
+  .table-wrap{
+    overflow-x:auto; 
+    overflow-y:auto; 
+    max-height:65vh; /* กำหนดความสูงให้เลื่อนได้ */
+    border-radius:12px;
+    border:1px solid #e5e7eb;
+    margin-bottom:16px;
+  }
   table{width:100%;border-collapse:collapse;font-size:.92rem;background:#fff}
   thead{background:#4a3f8f;color:#fff}
-  th{padding:10px 8px;text-align:left;font-weight:600;white-space:nowrap;font-size:.85rem}
+  th{
+    padding:10px 8px;
+    text-align:left;
+    font-weight:600;
+    white-space:nowrap;
+    font-size:.85rem;
+    position:sticky; /* ตรึงหัวตาราง */
+    top:0;
+    background:#4a3f8f; /* ต้องมี background ทึบเพื่อไม่ให้ทะลุ */
+    z-index:10;
+  }
   td{padding:8px;border-bottom:1px solid #f0f0f0;white-space:nowrap}
   tbody tr:nth-child(even) td{background:#fafafa}
   tbody tr:hover td{background:#eef2ff}
   .num{text-align:right;font-family:'Courier New',monospace}
   .balance{font-weight:600;color:#059669}
-  /* ลบ CSS ของ .summary และ .stat ออกแล้ว */
   .actions{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap}
   .actions button{width:auto;flex:1;min-width:140px;padding:14px;font-size:1.05rem}
   .btn-outline{background:#fff;color:#4a3f8f;border:2px solid #4a3f8f}
@@ -38,7 +56,45 @@
   .loading{text-align:center;padding:40px;color:#666}
   .spinner{display:inline-block;width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#667eea;border-radius:50%;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  @media print{body{background:#fff;padding:0}.card{box-shadow:none;padding:0}.actions,.logout{display:none}}
+  
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .card { padding: 12px; }
+    
+    /* ซ่อนคอลัมน์: ชื่อนักเรียน (2), ผู้รับฝาก (7), หมายเหตุ (8) */
+    th:nth-child(2), td:nth-child(2),
+    th:nth-child(7), td:nth-child(7),
+    th:nth-child(8), td:nth-child(8) {
+      display: none;
+    }
+    
+    /* ปรับตารางให้พอดีหน้าจอ */
+    table { 
+      font-size: 0.75rem; 
+      table-layout: fixed; /* ล็อคความกว้างคอลัมน์ให้พอดี */
+      width: 100%;
+    }
+    th, td {
+      padding: 6px 2px;
+      white-space: normal; /* อนุญาตให้ข้อความตัดบรรทัดได้ */
+      word-break: break-word;
+      text-align: center;
+    }
+    .num {
+      text-align: right;
+    }
+    th { font-size: 0.7rem; }
+    
+    /* ปรับขนาดปุ่มให้เหมาะกับมือถือ */
+    .actions button { font-size: 0.9rem; padding: 10px; min-width: 100%; }
+  }
+
+  @media print{
+    body{background:#fff;padding:0}
+    .card{box-shadow:none;padding:0}
+    .actions,.logout{display:none}
+    .table-wrap{max-height:none;overflow:visible} /* ให้พิมพ์ได้ครบทุกหน้า */
+  }
 </style>
 </head>
 <body>
@@ -67,7 +123,7 @@
       </div>
       
       <!-- ตารางข้อมูล -->
-      <div class="table-wrap">
+      <div class="table-wrap" id="tableWrap">
         <table>
           <thead>
             <tr>
@@ -86,7 +142,6 @@
         </table>
       </div>
 
-      <!-- ลบส่วน summary ออก เหลือแค่ปุ่ม -->
       <div class="actions">
         <button class="btn-outline" id="pdfBtn" type="button">📄 ดาวน์โหลด PDF</button>
         <button class="logout" id="logoutBtn" type="button">🚪 ออกจากระบบ</button>
@@ -147,12 +202,17 @@ function renderStudent(d){
   $('studentClass').textContent=d.className||'';
   $('studentSchool').textContent=d.schoolName||'';
   $('studentYear').textContent=d.year||'';
+  
   const tbody=$('txBody');
   tbody.innerHTML='';
+  
   if(!d.transactions||!d.transactions.length){
     tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#999;padding:24px">ยังไม่มีรายการ</td></tr>';
   }else{
     d.transactions.forEach(tx=>{
+      // ลบแถวที่เป็น "รวมทั้งหมด" ออก (ถ้ามีข้อมูลส่งมา)
+      if (String(tx.date).includes('รวม') || String(tx.student).includes('รวม')) return;
+
       const tr=document.createElement('tr');
       tr.innerHTML=
         '<td>'+fmtDate(tx.date)+'</td>'+
@@ -167,7 +227,16 @@ function renderStudent(d){
       tbody.appendChild(tr);
     });
   }
+  
   currentPdfUrl=d.pdfUrl||'';
+
+  // Auto Scroll ลงไปที่แถวล่าสุด (ด้านล่างสุด) หลังจากตารางโหลดเสร็จ
+  setTimeout(() => {
+    const tableWrap = document.getElementById('tableWrap');
+    if (tableWrap) {
+      tableWrap.scrollTop = tableWrap.scrollHeight;
+    }
+  }, 150); // หน่วงเวลาเล็กน้อยเพื่อให้ DOM วาดเสร็จ
 }
 
 function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
