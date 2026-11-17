@@ -6,6 +6,7 @@
 <title>สมุดออมทรัพย์นักเรียน</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
+  /* ... (โค้ด CSS เหมือนเดิมเป๊ะๆ) ... */
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Sarabun',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:16px;color:#222}
   .container{max-width:1200px;margin:0 auto}
@@ -50,7 +51,8 @@
 </head>
 <body>
 <div class="container">
-  <div id="loginView" class="card">
+  <!-- หน้า Login (จะถูกซ่อนถ้ามี ?name= ใน URL) -->
+  <div id="loginView" class="card hidden">
     <h1>🏦 สมุดออมทรัพย์นักเรียน</h1>
     <p class="sub">พิมพ์ชื่อเล่นหรือชื่อที่ตรงกับชีทออมทรัพย์ของคุณ (เช่น สกาย)</p>
     <form id="loginForm" autocomplete="on">
@@ -60,10 +62,12 @@
     <div id="loginError" class="error"></div>
   </div>
 
+  <!-- หน้า Loading -->
   <div id="loadingView" class="card hidden">
-    <div class="loading"><div class="spinner"></div><p style="margin-top:12px">กำลังโหลด...</p></div>
+    <div class="loading"><div class="spinner"></div><p style="margin-top:12px">กำลังโหลดข้อมูล...</p></div>
   </div>
 
+  <!-- หน้าแสดงข้อมูล -->
   <div id="dataView" class="hidden">
     <div class="card">
       <div class="book-header">
@@ -98,16 +102,14 @@
       </div>
       <div class="actions">
         <button class="btn-outline" id="pdfBtn" type="button">📄 ดาวน์โหลด PDF</button>
-        <button class="logout" id="logoutBtn" type="button">🚪 ออกจากระบบ</button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-/* ⚠️ URL ของ Tenant (ตรวจสอบให้แน่ใจว่าเป็นอันล่าสุด) */
+/* ⚠️ URL ของ Tenant */
 const TENANT_API = 'https://script.google.com/macros/s/AKfycbywpeVLOUKB72ycGiJ2r6ya_X-NGHmFvFBTndsKmWLUMKG3d8SuoV0IOPGYxX9ZRjiygA/exec';
-const LS_KEY = 'saving_viewer_session_v1';
 let currentPdfUrl = '';
 
 function $(id){return document.getElementById(id);}
@@ -120,23 +122,19 @@ function fmtDate(d){
   return m[3]+'/'+m[2]+'/'+y;
 }
 function show(id){['loginView','loadingView','dataView'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
-function saveSession(s){localStorage.setItem(LS_KEY,JSON.stringify(s));}
-function clearSession(){localStorage.removeItem(LS_KEY);}
-function loadSession(){try{return JSON.parse(localStorage.getItem(LS_KEY)||'null');}catch(e){return null;}}
 
 async function loadData(name){
   show('loadingView');
   try{
-    const res=await fetch(TENANT_API+'?name='+encodeURIComponent(name));
+    // เพิ่ม Cache Busting ป้องกันเบราว์เซอร์จำข้อมูลเก่า
+    const res=await fetch(TENANT_API+'?name='+encodeURIComponent(name)+'&t='+Date.now());
     const json=await res.json();
     if(!json.ok)throw new Error(json.error||'ไม่พบข้อมูล');
-    saveSession({name});
     renderStudent(json.data);
     show('dataView');
   }catch(e){
-    clearSession();
     show('loginView');
-    $('loginError').textContent=e.message;
+    $('loginError').textContent=e.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
   }
 }
 
@@ -181,17 +179,23 @@ $('loginForm').addEventListener('submit',e=>{
   $('loginError').textContent='';
   loadData(name);
 });
-$('logoutBtn').addEventListener('click',()=>{clearSession();show('loginView');});
+
 $('pdfBtn').addEventListener('click',()=>{
   if(currentPdfUrl)window.open(currentPdfUrl,'_blank');
   else alert('ยังไม่มีไฟล์ PDF');
 });
 
+// 🌟 ระบบอ่าน URL อัตโนมัติ: ถ้าในลิงก์มี ?name=สกาย ให้โหลดข้อมูลทันที
 window.addEventListener('DOMContentLoaded',()=>{
-  const s=loadSession();
-  if(s&&s.name){
-    $('nameInput').value=s.name;
-    loadData(s.name);
+  const urlParams = new URLSearchParams(window.location.search);
+  const nameFromUrl = urlParams.get('name');
+  
+  if(nameFromUrl){
+    // ถ้ามีชื่อใน URL ให้โหลดเลย
+    loadData(nameFromUrl);
+  } else {
+    // ถ้าไม่มีชื่อใน URL (พิมพ์เข้าเว็บตรงๆ) ให้แสดงหน้า Login
+    show('loginView');
   }
 });
 </script>
