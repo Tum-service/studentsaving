@@ -6,7 +6,6 @@
 <title>สมุดออมทรัพย์นักเรียน</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-  /* ... (โค้ด CSS เหมือนเดิมเป๊ะๆ) ... */
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Sarabun',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:16px;color:#222}
   .container{max-width:1200px;margin:0 auto}
@@ -102,14 +101,15 @@
       </div>
       <div class="actions">
         <button class="btn-outline" id="pdfBtn" type="button">📄 ดาวน์โหลด PDF</button>
+        <button class="logout" id="logoutBtn" type="button">🚪 ออกจากระบบ</button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-/* ⚠️ URL ของ Tenant */
-const TENANT_API = 'https://script.google.com/macros/s/AKfycbywpeVLOUKB72ycGiJ2r6ya_X-NGHmFvFBTndsKmWLUMKG3d8SuoV0IOPGYxX9ZRjiygA/exec';
+/* ⚠️ URL ของ Tenant อันใหม่ที่คุณให้มา */
+const TENANT_API = 'https://script.google.com/macros/s/AKfycbzekZKZZd9WBVdNi6HXgzvZYkDfC1v2arTwOIE72oQxOf8hgKgCGUCVFYhQynO5SQkz2A/exec';
 let currentPdfUrl = '';
 
 function $(id){return document.getElementById(id);}
@@ -127,14 +127,14 @@ async function loadData(name){
   show('loadingView');
   try{
     // เพิ่ม Cache Busting ป้องกันเบราว์เซอร์จำข้อมูลเก่า
-    const res=await fetch(TENANT_API+'?name='+encodeURIComponent(name)+'&t='+Date.now());
-    const json=await res.json();
-    if(!json.ok)throw new Error(json.error||'ไม่พบข้อมูล');
+    const res = await fetch(TENANT_API + '?name=' + encodeURIComponent(name) + '&t=' + Date.now());
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error || 'ไม่พบข้อมูล');
     renderStudent(json.data);
     show('dataView');
   }catch(e){
     show('loginView');
-    $('loginError').textContent=e.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+    $('loginError').textContent = e.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
   }
 }
 
@@ -178,6 +178,12 @@ $('loginForm').addEventListener('submit',e=>{
   if(!name)return $('loginError').textContent='กรุณาพิมพ์ชื่อ';
   $('loginError').textContent='';
   loadData(name);
+});
+
+$('logoutBtn').addEventListener('click',()=>{
+  // ล้างค่า name ใน URL และกลับไปหน้า Login
+  window.history.replaceState(null, '', window.location.pathname);
+  show('loginView');
 });
 
 $('pdfBtn').addEventListener('click',()=>{
