@@ -50,7 +50,6 @@
 </head>
 <body>
 <div class="container">
-  <!-- หน้า Login (จะถูกซ่อนถ้ามี ?name= ใน URL) -->
   <div id="loginView" class="card hidden">
     <h1>🏦 สมุดออมทรัพย์นักเรียน</h1>
     <p class="sub">พิมพ์ชื่อเล่นหรือชื่อที่ตรงกับชีทออมทรัพย์ของคุณ (เช่น สกาย)</p>
@@ -61,12 +60,10 @@
     <div id="loginError" class="error"></div>
   </div>
 
-  <!-- หน้า Loading -->
   <div id="loadingView" class="card hidden">
-    <div class="loading"><div class="spinner"></div><p style="margin-top:12px">กำลังโหลดข้อมูล...</p></div>
+    <div class="loading"><div class="spinner"></div><p style="margin-top:12px">กำลังโหลด...</p></div>
   </div>
 
-  <!-- หน้าแสดงข้อมูล -->
   <div id="dataView" class="hidden">
     <div class="card">
       <div class="book-header">
@@ -108,7 +105,7 @@
 </div>
 
 <script>
-/* ⚠️ URL ของ Tenant อันใหม่ที่คุณให้มา */
+/* ⚠️ URL ของ Tenant */
 const TENANT_API = 'https://script.google.com/macros/s/AKfycbzekZKZZd9WBVdNi6HXgzvZYkDfC1v2arTwOIE72oQxOf8hgKgCGUCVFYhQynO5SQkz2A/exec';
 let currentPdfUrl = '';
 
@@ -123,19 +120,37 @@ function fmtDate(d){
 }
 function show(id){['loginView','loadingView','dataView'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
 
-async function loadData(name){
+// 🌟 ใช้ JSONP ในการดึงข้อมูล
+function loadData(name) {
   show('loadingView');
-  try{
-    // เพิ่ม Cache Busting ป้องกันเบราว์เซอร์จำข้อมูลเก่า
-    const res = await fetch(TENANT_API + '?name=' + encodeURIComponent(name) + '&t=' + Date.now());
-    const json = await res.json();
-    if(!json.ok) throw new Error(json.error || 'ไม่พบข้อมูล');
-    renderStudent(json.data);
-    show('dataView');
-  }catch(e){
+  const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
+  
+  window[callbackName] = function(data) {
+    delete window[callbackName];
+    const script = document.getElementById('jsonp_script');
+    if (script) document.body.removeChild(script);
+    
+    if(!data.ok) {
+      show('loginView');
+      $('loginError').textContent = data.error || 'ไม่พบข้อมูล';
+    } else {
+      renderStudent(data.data);
+      show('dataView');
+    }
+  };
+  
+  const script = document.createElement('script');
+  script.id = 'jsonp_script';
+  script.src = TENANT_API + '?name=' + encodeURIComponent(name) + '&callback=' + callbackName + '&t=' + Date.now();
+  
+  script.onerror = function() {
+    delete window[callbackName];
+    if (script) document.body.removeChild(script);
     show('loginView');
-    $('loginError').textContent = e.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
-  }
+    $('loginError').textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+  };
+  
+  document.body.appendChild(script);
 }
 
 function renderStudent(d){
@@ -181,7 +196,6 @@ $('loginForm').addEventListener('submit',e=>{
 });
 
 $('logoutBtn').addEventListener('click',()=>{
-  // ล้างค่า name ใน URL และกลับไปหน้า Login
   window.history.replaceState(null, '', window.location.pathname);
   show('loginView');
 });
@@ -191,16 +205,13 @@ $('pdfBtn').addEventListener('click',()=>{
   else alert('ยังไม่มีไฟล์ PDF');
 });
 
-// 🌟 ระบบอ่าน URL อัตโนมัติ: ถ้าในลิงก์มี ?name=สกาย ให้โหลดข้อมูลทันที
 window.addEventListener('DOMContentLoaded',()=>{
   const urlParams = new URLSearchParams(window.location.search);
   const nameFromUrl = urlParams.get('name');
   
   if(nameFromUrl){
-    // ถ้ามีชื่อใน URL ให้โหลดเลย
     loadData(nameFromUrl);
   } else {
-    // ถ้าไม่มีชื่อใน URL (พิมพ์เข้าเว็บตรงๆ) ให้แสดงหน้า Login
     show('loginView');
   }
 });
