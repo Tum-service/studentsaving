@@ -35,6 +35,10 @@
   th,td{padding:10px;text-align:left;border-bottom:1px solid #e2e8f0}
   th{background:#f8fafc;font-weight:600;position:sticky;top:0;z-index:1}
   tr:hover{background:#f1f5f9}
+  th,td{white-space:nowrap}
+  td.c-note{white-space:normal;max-width:12em;word-break:break-word}
+  .acts{display:flex;gap:.35em}
+  table .btn-sm{padding:.3em .75em;font-size:1em;min-height:0;line-height:1.3}
   .pick-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
   .form-group{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
   .form-group.full{grid-template-columns:1fr}
@@ -69,20 +73,10 @@
     .form-group>div:nth-child(1),.form-group>div:nth-child(5),.form-group>div:nth-child(6){grid-column:1/-1}
     label.lbl{font-size:.75rem}
     #saveBtn{flex:1}
-    /* ตารางกะทัดรัดสำหรับมือถือ (ไม่มีกรอบเลื่อนซ้อน) */
-    .only-m{display:flex}
-    .table-wrap{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;max-height:none!important}
-    table{font-size:.72rem}
-    th,td{padding:7px 3px;white-space:nowrap;font-size:.72rem}
-    th{position:static}
-    .num{text-align:right}
-    .c-carry,.c-by,.c-note{display:none}
-    .d-full{display:none}.d-short{display:inline}
-    .table-wrap.full .c-carry,.table-wrap.full .c-by,.table-wrap.full .c-note{display:table-cell}
-    .table-wrap.full .d-full{display:inline}.table-wrap.full .d-short{display:none}
-    .acts{display:flex;gap:4px}
-    .btn-sm .t{display:none}.btn-sm .i{display:inline}
-    .btn-sm{padding:6px 8px;min-height:32px;font-size:.85rem}
+    /* ตารางบนมือถือ: หน้าตาเหมือนจอใหญ่ ย่อทั้งตารางให้พอดีจอ (คำนวณใน fitScale) */
+    .table-wrap{overflow-x:hidden}
+    th,td{padding:.55em .5em}
+    .btn-sm{min-height:0}
   }
 </style>
 </head>
@@ -163,10 +157,6 @@
       </div>
 
       <p id="txHint" class="hint"></p>
-      <div class="only-m" style="gap:8px;margin-bottom:8px;flex-wrap:wrap">
-        <button id="moreBtn" class="btn-gray btn-sm hidden" onclick="showMore()"></button>
-        <button id="colsBtn" class="btn-gray btn-sm" onclick="toggleCols()">↔ ดูคอลัมน์ทั้งหมด</button>
-      </div>
       <div id="tableWrap" class="table-wrap">
         <table>
           <thead>
@@ -191,14 +181,10 @@
 
 <script>
 const MASTER_API = 'https://script.google.com/macros/s/AKfycbwUEz0s2i9SQQ6hWVUpg0mIr8Oq-4ckJxhYR_vuy5sVwG6tyBMiMsQhu2ki03F3ceF3/exec';
-function isMobile(){return !!(window.matchMedia&&window.matchMedia('(max-width:700px)').matches);}
+function isMobile(){return false;}   // มือถือใช้ตารางเดียวกับจอใหญ่ (ย่อสัดส่วนให้พอดีจอ)
 function visRows(){return 5;}          // คอมพิวเตอร์: โชว์ 5 รายการล่าสุดในกรอบ (มือถือไม่มีกรอบเลื่อนซ้อน)
 let shownMax=10;                       // มือถือ: โชว์กี่รายการล่าสุด กด "ดูรายการก่อนหน้า" เพื่อเพิ่ม
 function showMore(){shownMax+=15;renderTransactions();}
-function toggleCols(){
-  const w=$('tableWrap');w.classList.toggle('full');
-  $('colsBtn').textContent=w.classList.contains('full')?'↔ ซ่อนคอลัมน์':'↔ ดูคอลัมน์ทั้งหมด';
-}
 const UNASSIGNED = '__unassigned__';
 
 let adminPassword = '';
@@ -442,13 +428,11 @@ function renderTransactions(){
   const mob=isMobile();
   const list=mob?txCache.slice(-shownMax):txCache;
   const more=mob?txCache.length-list.length:0;
-  $('moreBtn').classList.toggle('hidden',!more);
-  if(more)$('moreBtn').textContent='⬆ ดูรายการก่อนหน้า (อีก '+more+' รายการ)';
   list.forEach(function(tx){
     const tr=document.createElement('tr');
     if(tx.pending)tr.style.opacity='.55';
     tr.innerHTML=
-      '<td class="c-date" title="'+esc(tx.date)+'"><span class="d-full">'+esc(tx.date)+'</span><span class="d-short">'+esc(shortDate(tx.date))+'</span></td>'+
+      '<td class="c-date">'+esc(tx.date)+'</td>'+
       '<td class="num c-carry">'+fmt(tx.carry)+'</td>'+
       '<td class="num" style="color:#059669">'+(tx.deposit?fmt(tx.deposit):'-')+'</td>'+
       '<td class="num" style="color:#dc2626">'+(tx.withdraw?fmt(tx.withdraw):'-')+'</td>'+
@@ -471,7 +455,18 @@ function renderTransactions(){
 }
 
 /* ให้กล่องตารางสูงพอดี 5 แถวล่าสุด แล้วเลื่อนลงล่างสุดอัตโนมัติ */
+/* ย่อฟอนต์ทั้งตารางให้ครบทุกคอลัมน์พอดีความกว้างจอ (padding/ปุ่มใช้หน่วย em จึงย่อตามกัน) */
+function fitScale(){
+  const wrap=$('tableWrap'),tbl=wrap.querySelector('table');
+  if(!wrap.offsetParent)return;
+  tbl.style.fontSize='16px';tbl.style.width='auto';
+  const nat=tbl.offsetWidth,avail=wrap.clientWidth;
+  tbl.style.width='';
+  const size=16*avail/nat;
+  tbl.style.fontSize=(size>=14.4)?'':Math.max(size,6).toFixed(2)+'px';
+}
 function fitTable(){
+  fitScale();
   const wrap=$('tableWrap');
   const rows=$('txBody').rows;
   wrap.style.maxHeight='';
@@ -485,6 +480,7 @@ function fitTable(){
   wrap.scrollTop=wrap.scrollHeight;
 }
 window.addEventListener('resize',fitTable);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitTable);
 if(window.matchMedia){const mq=window.matchMedia('(max-width:700px)');(mq.addEventListener?mq.addEventListener('change',function(){renderTransactions();}):mq.addListener(function(){renderTransactions();}));}
 function shortDate(d){const m=/^\d{4}-(\d{2})-(\d{2})$/.exec(d||'');return m?m[2]+'/'+m[1]:d;}
 
