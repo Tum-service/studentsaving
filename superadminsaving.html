@@ -1,572 +1,194 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Super Admin - จัดการออมทรัพย์</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Sarabun',sans-serif;background:#f3f4f6;color:#222}
-  .container{max-width:1400px;margin:0 auto;padding:16px}
-  .card{background:#fff;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,.1);padding:20px;margin-bottom:16px}
-  h1{font-size:1.3rem;color:#1e293b;margin-bottom:12px}
-  h2{font-size:1.1rem;color:#334155;margin-bottom:12px}
-  h3{font-size:1rem;color:#475569;margin-bottom:8px}
-  .login-box{max-width:400px;margin:100px auto;text-align:center}
-  input,select,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-family:inherit;font-size:0.95rem;margin-bottom:10px}
-  button{background:#1e293b;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit}
-  button:hover{background:#334155}
-  button:disabled{opacity:.6;cursor:not-allowed}
-  select:disabled{background:#f1f5f9;color:#94a3b8}
-  .btn-red{background:#dc2626}
-  .btn-red:hover{background:#b91c1c}
-  .btn-green{background:#059669}
-  .btn-green:hover{background:#047857}
-  .btn-blue{background:#2563eb}
-  .btn-blue:hover{background:#1d4ed8}
-  .btn-gray{background:#64748b}
-  .btn-gray:hover{background:#475569}
-  .btn-sm{padding:4px 10px;font-size:0.8rem}
-  .hidden{display:none!important}
-  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
-  .table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:8px}
-  table{width:100%;border-collapse:collapse;font-size:0.9rem}
-  th,td{padding:10px;text-align:left;border-bottom:1px solid #e2e8f0}
-  th{background:#f8fafc;font-weight:600;position:sticky;top:0;z-index:1}
-  tr:hover{background:#f1f5f9}
-  .pick-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
-  .form-group{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
-  .form-group.full{grid-template-columns:1fr}
-  label.lbl{display:block;font-size:0.8rem;color:#64748b;margin-bottom:4px;text-align:left}
-  .form-box{background:#f8fafc;padding:16px;border-radius:8px;margin-bottom:16px;border:1px solid #e2e8f0}
-  .form-box.editing{background:#fffbeb;border-color:#f59e0b}
-  .hint{font-size:0.85rem;color:#64748b;margin-bottom:8px}
-  .status{font-weight:bold;padding:4px 8px;border-radius:4px;font-size:0.8rem}
-  .status-ok{background:#d1fae5;color:#065f46}
-  .status-err{background:#fee2e2;color:#991b1b}
-  .status-info{background:#e0f2fe;color:#075985}
-  @media (max-width:700px){
-    .pick-row,.form-group{grid-template-columns:1fr}
-  }
-</style>
-</head>
-<body>
-<div class="container">
-  <div id="loginView" class="login-box card">
-    <h1>🔐 Super Admin Login</h1>
-    <input id="adminPassword" type="password" placeholder="รหัสผ่าน (Default: admin1234)" required>
-    <button onclick="login()">เข้าสู่ระบบ</button>
-    <p id="loginError" style="color:red;margin-top:10px;font-size:0.9rem"></p>
-  </div>
+/* ============================================================
+ *  PATCH v3 — superadminsaving.html  (แก้เฉพาะในแท็ก <script>)
+ *
+ *  ขั้นตอน
+ *   A) วาง "ส่วน ก" ไว้ใต้บรรทัด   let busy=false;
+ *   B) ลบฟังก์ชันเดิมเหล่านี้ทิ้ง: onStudentChange, loadTransactions,
+ *      renderTransactions, saveTransaction, deleteTx, refreshPdf
+ *   C) วาง "ส่วน ข" แทน  (ส่วน HTML / CSS ไม่ต้องแก้)
+ * ============================================================ */
 
-  <div id="adminView" class="hidden">
-    <div class="header">
-      <h1>📊 ระบบจัดการออมทรัพย์ (Super Admin)</h1>
-      <button class="btn-red" onclick="logout()">ออกจากระบบ</button>
-    </div>
+/* ===================== ส่วน ก : ตัวแปรใหม่ ===================== */
+const txStore = {};            // รายการล่าสุดของแต่ละแท็บ (สลับนักเรียนแล้วเห็นทันที)
+const pdfTimers = {};          // รอหลังบันทึกล่าสุด ค่อยสร้าง PDF ครั้งเดียว
+const PDF_DELAY = 8000;        // 8 วินาที
+let opQueue = Promise.resolve(), pendingOps = 0;
+function clone(a) { return JSON.parse(JSON.stringify(a || [])); }
 
-    <div class="card">
-      <h2>เลือกผู้รับฝาก → ผู้ฝาก</h2>
-      <div class="pick-row">
-        <div>
-          <label class="lbl" for="receiverSelect">1) ผู้รับฝาก</label>
-          <select id="receiverSelect" onchange="onReceiverChange()"></select>
-        </div>
-        <div>
-          <label class="lbl" for="studentSelect">2) ผู้ฝาก</label>
-          <select id="studentSelect" onchange="onStudentChange()" disabled></select>
-        </div>
-        <div>
-          <button id="syncBtn" class="btn-green" style="margin-bottom:10px" onclick="syncTabs()">🔄 Sync สร้างโฟลเดอร์/ไฟล์ใหม่</button>
-        </div>
-      </div>
-    </div>
+/* ===================== ส่วน ข : ฟังก์ชัน ===================== */
 
-    <div id="txSection" class="card hidden">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">
-        <h2 id="txTitle" style="margin-bottom:0">รายการเดินบัญชี</h2>
-        <div>
-          <button id="pdfBtn" class="btn-blue" onclick="regeneratePdf()">📄 อัปเดต PDF ทันที</button>
-        </div>
-      </div>
-
-      <div id="formBox" class="form-box">
-        <h3 id="formTitle">➕ เพิ่มรายการใหม่</h3>
-        <div class="form-group">
-          <div>
-            <label class="lbl" for="addDate">วันที่</label>
-            <input type="date" id="addDate">
-          </div>
-          <div>
-            <label class="lbl" for="addDeposit">ฝาก (บาท)</label>
-            <input type="number" id="addDeposit" placeholder="0.00" step="0.01" min="0">
-          </div>
-          <div>
-            <label class="lbl" for="addWithdraw">ถอน (บาท)</label>
-            <input type="number" id="addWithdraw" placeholder="0.00" step="0.01" min="0">
-          </div>
-          <div>
-            <label class="lbl" for="addTransfer">โอนให้นักเรียน (บาท)</label>
-            <input type="number" id="addTransfer" placeholder="0.00" step="0.01" min="0">
-          </div>
-          <div>
-            <label class="lbl" for="addBy">ผู้รับฝาก (เปลี่ยนชื่อได้)</label>
-            <input type="text" id="addBy" placeholder="ผู้รับฝาก">
-          </div>
-          <div>
-            <label class="lbl" for="addNote">หมายเหตุ</label>
-            <input type="text" id="addNote" placeholder="หมายเหตุ">
-          </div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button id="saveBtn" class="btn-green" onclick="saveTransaction()">บันทึกรายการ</button>
-          <button id="cancelEditBtn" class="btn-gray hidden" onclick="resetForm()">ยกเลิกการแก้ไข</button>
-        </div>
-        <p id="addStatus" style="margin-top:8px;font-size:0.9rem"></p>
-      </div>
-
-      <p id="txHint" class="hint"></p>
-      <div id="tableWrap" class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>วันที่</th>
-              <th class="num">ยอดยกมา</th>
-              <th class="num">ฝาก</th>
-              <th class="num">ถอน</th>
-              <th class="num">โอน</th>
-              <th class="num">คงเหลือ</th>
-              <th>ผู้รับฝาก</th>
-              <th>หมายเหตุ</th>
-              <th>จัดการ</th>
-            </tr>
-          </thead>
-          <tbody id="txBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-const MASTER_API = 'https://script.google.com/macros/s/AKfycbwUEz0s2i9SQQ6hWVUpg0mIr8Oq-4ckJxhYR_vuy5sVwG6tyBMiMsQhu2ki03F3ceF3/exec';
-const VISIBLE_ROWS = 5;            // จำนวนรายการล่าสุดที่โชว์ในตาราง
-const UNASSIGNED = '__unassigned__';
-
-let adminPassword = '';
-let currentTabName = '';
-let receiverData = { receivers: [], unassigned: [] };
-let txCache = [];
-let editingRow = null;
-let pdfJob = 0;
-let busy = false;
-
-function $(id){return document.getElementById(id);}
-function show(id){['loginView','adminView'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
-function fmt(n){return (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function todayStr(){
-  const d=new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-function addOpt(sel,value,text){
-  const o=document.createElement('option');
-  o.value=value;o.textContent=text;sel.appendChild(o);
-}
-function saveLogin(p){try{localStorage.setItem('admin_pass',p);}catch(e){}}
-function clearLogin(){try{localStorage.removeItem('admin_pass');}catch(e){}}
-
-/* ---------- เรียก Master Web App แบบ JSONP (วิธีเดียวกับตอนล็อกอิน) ---------- */
-function api(params,timeoutMs){
-  return new Promise(function(resolve,reject){
-    const cb='jsonp_cb_'+Date.now()+'_'+Math.floor(Math.random()*1000000);
-    const s=document.createElement('script');
-    let finished=false;
-    const cleanup=function(){
-      clearTimeout(timer);
-      delete window[cb];
-      if(s.parentNode)s.parentNode.removeChild(s);
-    };
-    const timer=setTimeout(function(){
-      if(finished)return;
-      finished=true;
-      cleanup();
-      window[cb]=function(){delete window[cb];};
-      reject(new Error('เซิร์ฟเวอร์ตอบช้าเกินไป กรุณาลองใหม่'));
-    },timeoutMs||90000);
-    window[cb]=function(data){
-      if(finished)return;
-      finished=true;
-      cleanup();
-      resolve(data);
-    };
-    s.onerror=function(){
-      if(finished)return;
-      finished=true;
-      cleanup();
-      reject(new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (กรุณา Deploy Master เป็น New version)'));
-    };
-    const q=Object.assign({password:adminPassword},params,{callback:cb,t:Date.now()});
-    s.src=MASTER_API+'?'+Object.keys(q).map(function(k){
-      return encodeURIComponent(k)+'='+encodeURIComponent(q[k]==null?'':q[k]);
-    }).join('&');
-    document.body.appendChild(s);
+/* คำนวณยอดยกมา/คงเหลือในหน้าเว็บทันที (ให้แถวขึ้นก่อนที่ชีตจะตอบ) */
+function recompute(list, base) {
+  let bal = Number(base) || 0;
+  list.forEach(function (t) {
+    t.carry = bal;
+    bal = Math.round((bal + (Number(t.deposit) || 0) - (Number(t.withdraw) || 0) - (Number(t.transfer) || 0)) * 100) / 100;
+    t.balance = bal;
   });
 }
 
-function setStatus(text,kind){
-  const el=$('addStatus');
-  el.innerHTML='';
-  if(!text)return;
-  const sp=document.createElement('span');
-  sp.className='status'+(kind?' status-'+kind:'');
-  sp.textContent=text;
-  el.appendChild(sp);
+/* แก้ตารางในหน้าเว็บทันที (optimistic) */
+function applyLocal(kind, row, rowIndex) {
+  const base = txCache.length ? (Number(txCache[0].carry) || 0) : 0;
+  if (kind !== 'add') txCache = txCache.filter(function (t) { return t.rowIndex !== rowIndex; });
+  if (kind !== 'delete') {
+    const nt = { rowIndex: -1, date: row.date, deposit: row.deposit, withdraw: row.withdraw,
+                 transfer: row.transfer, by: row.by, note: row.note, pending: true };
+    let i = txCache.length;
+    while (i > 0 && String(txCache[i - 1].date) > String(nt.date)) i--;
+    txCache.splice(i, 0, nt);
+  }
+  recompute(txCache, base);
+  renderTransactions();
 }
 
-/* ---------- Login / Logout ---------- */
-async function login(){
-  const pass=$('adminPassword').value;
-  if(!pass)return alert('กรุณากรอกรหัสผ่าน');
-  $('loginError').textContent='กำลังตรวจสอบและโหลดรายชื่อ...';
-  try{
-    const data=await api({action:'getReceivers',password:pass},90000);
-    if(!data.ok){
-      let msg=data.error||'เข้าสู่ระบบไม่สำเร็จ';
-      if(data.error==='unauthorized'){msg='รหัสผ่านไม่ถูกต้อง';clearLogin();}
-      else if(data.error==='unknown action'){msg='Master ยังเป็นโค้ดเก่า (ต้อง Deploy เป็น New version)';}
-      $('loginError').textContent=msg;
-      return;
+/* ส่งงานเข้าคิวทีละอัน (ชีตเขียนทีละรายการ ปลอดภัย) แล้วรับรายการจริงกลับมาใน request เดียว */
+function runOp(tab, params, msg) {
+  let fin = false;
+  const end = function () { if (!fin) { fin = true; pendingOps--; } };
+  pendingOps++;
+  opQueue = opQueue.then(function () {
+    return api(params, 90000);
+  }).then(function (json) {
+    end();
+    if (!json.ok) throw new Error(json.error || 'ไม่สำเร็จ');
+    txStore[tab] = json.data || [];
+    if (tab === currentTabName && !pendingOps) {
+      txCache = clone(txStore[tab]);
+      renderTransactions();
+      setStatus(msg + ' · PDF จะอัปเดตอัตโนมัติ', 'ok');
     }
-    $('loginError').textContent='';
-    adminPassword=pass;
-    saveLogin(pass);
-    receiverData=data.data||{receivers:[],unassigned:[]};
-    show('adminView');
-    populateReceivers();
-    onReceiverChange();
-  }catch(e){
-    $('loginError').textContent=e.message;
-  }
-}
-
-function logout(){
-  clearLogin();
-  adminPassword='';
-  currentTabName='';
-  show('loginView');
-  $('adminPassword').value='';
-  $('loginError').textContent='';
-}
-
-/* ---------- ผู้รับฝาก -> ผู้ฝาก ---------- */
-function populateReceivers(){
-  const sel=$('receiverSelect');
-  sel.innerHTML='';
-  addOpt(sel,'','-- เลือกผู้รับฝาก --');
-  receiverData.receivers.forEach(function(r){
-    addOpt(sel,r.name,r.name+' ('+r.students.length+' คน)');
+    markPdf(tab);
+  }).catch(function (e) {
+    end();
+    setStatus('❌ ' + e.message, 'err');
+    if (tab === currentTabName) loadTransactions();   // กลับไปใช้ข้อมูลจริงจากชีต
   });
-  if(receiverData.unassigned.length){
-    addOpt(sel,UNASSIGNED,'(ยังไม่มีผู้รับฝากใน Excel) ('+receiverData.unassigned.length+' คน)');
-  }
 }
 
-function studentsOf(key){
-  if(key===UNASSIGNED)return receiverData.unassigned;
-  const r=receiverData.receivers.find(function(x){return x.name===key;});
-  return r?r.students:[];
+/* สร้าง PDF แบบรอให้หยุดบันทึกก่อน (ไม่สร้างทุกครั้งที่กดบันทึก) */
+function markPdf(tab) {
+  clearTimeout(pdfTimers[tab]);
+  pdfTimers[tab] = setTimeout(function () { firePdf(tab); }, PDF_DELAY);
 }
-
-function fillStudents(){
-  const key=$('receiverSelect').value;
-  const sel=$('studentSelect');
-  sel.innerHTML='';
-  if(!key){
-    addOpt(sel,'','-- เลือกผู้รับฝากก่อน --');
-    sel.disabled=true;
-    return;
-  }
-  const list=studentsOf(key);
-  addOpt(sel,'','-- เลือกผู้ฝาก ('+list.length+' คน) --');
-  list.forEach(function(s){addOpt(sel,s.tabName,s.fullName+' ('+s.tabName+')');});
-  sel.disabled=false;
+function firePdf(tab) {
+  clearTimeout(pdfTimers[tab]);
+  delete pdfTimers[tab];
+  api({ action: 'regeneratePdf', tabName: tab }, 180000).then(function (j) {
+    if (tab !== currentTabName || pendingOps) return;
+    setStatus(j.ok ? '✅ บันทึกแล้ว · อัปเดต PDF แล้ว'
+                   : '⚠️ บันทึกแล้ว แต่อัปเดต PDF ไม่สำเร็จ (' + (j.error || '') + ')', j.ok ? 'ok' : 'err');
+  }).catch(function (e) {
+    if (tab === currentTabName && !pendingOps) setStatus('⚠️ บันทึกแล้ว แต่อัปเดต PDF ไม่สำเร็จ (' + e.message + ')', 'err');
+  });
 }
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) Object.keys(pdfTimers).forEach(function (t) { firePdf(t); });
+});
+window.addEventListener('beforeunload', function (e) {
+  if (pendingOps) { e.preventDefault(); e.returnValue = ''; }
+});
 
-function defaultBy(){
-  const k=$('receiverSelect').value;
-  return (k&&k!==UNASSIGNED)?k:'';
-}
-
-function onReceiverChange(){
-  currentTabName='';
-  editingRow=null;
+function onStudentChange() {
+  const tab = $('studentSelect').value;
   pdfJob++;
   setStatus('');
-  $('txSection').classList.add('hidden');
-  fillStudents();
-}
-
-function onStudentChange(){
-  const tab=$('studentSelect').value;
-  pdfJob++;
-  setStatus('');
-  editingRow=null;
-  if(!tab){
-    currentTabName='';
-    $('txSection').classList.add('hidden');
-    return;
-  }
-  currentTabName=tab;
-  txCache=[];
-  $('txBody').innerHTML='';
+  editingRow = null;
+  if (!tab) { currentTabName = ''; $('txSection').classList.add('hidden'); return; }
+  currentTabName = tab;
+  txCache = clone(txStore[tab]);                    // แสดงจากแคชทันที แล้วค่อยรีเฟรชเบื้องหลัง
   $('txSection').classList.remove('hidden');
-  $('txTitle').textContent='รายการเดินบัญชี: '+tab;
+  $('txTitle').textContent = 'รายการเดินบัญชี: ' + tab;
   resetForm();
+  if (txStore[tab]) renderTransactions(); else $('txBody').innerHTML = '';
   loadTransactions();
 }
 
-async function reloadReceivers(){
-  const data=await api({action:'getReceivers'},90000);
-  if(!data.ok)throw new Error(data.error||'โหลดรายชื่อไม่สำเร็จ');
-  receiverData=data.data;
-  const prevR=$('receiverSelect').value;
-  const prevS=$('studentSelect').value;
-  populateReceivers();
-  const has=function(sel,v){return Array.prototype.some.call(sel.options,function(o){return o.value===v;});};
-  if(prevR&&has($('receiverSelect'),prevR)){
-    $('receiverSelect').value=prevR;
-    fillStudents();
-    if(prevS&&has($('studentSelect'),prevS)){
-      $('studentSelect').value=prevS;
-    }else{
-      currentTabName='';
-      $('txSection').classList.add('hidden');
-    }
-  }else{
-    onReceiverChange();
-  }
-}
-
-/* ---------- โหลด/แสดงรายการ ---------- */
-async function loadTransactions(){
-  const tabName=currentTabName;
-  if(!tabName)return;
-  $('txHint').textContent='กำลังโหลดรายการ...';
-  try{
-    const data=await api({action:'getTransactions',tabName:tabName},90000);
-    if(tabName!==currentTabName)return;
-    if(!data.ok)throw new Error(data.error||'ไม่ทราบสาเหตุ');
-    txCache=data.data||[];
+async function loadTransactions() {
+  const tabName = currentTabName;
+  if (!tabName) return;
+  if (!txStore[tabName]) $('txHint').textContent = 'กำลังโหลดรายการ...';
+  try {
+    const data = await api({ action: 'getTransactions', tabName: tabName }, 90000);
+    if (tabName !== currentTabName || pendingOps) return;   // ระหว่างมีงานค้างในคิว ใช้ผลจากคิวแทน
+    if (!data.ok) throw new Error(data.error || 'ไม่ทราบสาเหตุ');
+    txStore[tabName] = data.data || [];
+    txCache = clone(txStore[tabName]);
     renderTransactions();
-  }catch(e){
-    if(tabName===currentTabName){
-      $('txHint').textContent='';
-      alert('โหลดข้อมูลไม่สำเร็จ: '+e.message);
+  } catch (e) {
+    if (tabName === currentTabName) {
+      $('txHint').textContent = '';
+      alert('โหลดข้อมูลไม่สำเร็จ: ' + e.message);
     }
   }
 }
 
-function renderTransactions(){
-  const tbody=$('txBody');
-  tbody.innerHTML='';
-  if(!txCache.length){
-    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:20px">ยังไม่มีรายการ</td></tr>';
-    $('txHint').textContent='';
+function renderTransactions() {
+  const tbody = $('txBody');
+  tbody.innerHTML = '';
+  if (!txCache.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px">ยังไม่มีรายการ</td></tr>';
+    $('txHint').textContent = '';
     fitTable();
     return;
   }
-  txCache.forEach(function(tx){
-    const tr=document.createElement('tr');
-    tr.innerHTML=
-      '<td>'+esc(tx.date)+'</td>'+
-      '<td class="num">'+fmt(tx.carry)+'</td>'+
-      '<td class="num" style="color:#059669">'+(tx.deposit?fmt(tx.deposit):'-')+'</td>'+
-      '<td class="num" style="color:#dc2626">'+(tx.withdraw?fmt(tx.withdraw):'-')+'</td>'+
-      '<td class="num" style="color:#d97706">'+(tx.transfer?fmt(tx.transfer):'-')+'</td>'+
-      '<td class="num"><b>'+fmt(tx.balance)+'</b></td>'+
-      '<td>'+esc(tx.by||'')+'</td>'+
-      '<td>'+esc(tx.note||'')+'</td>'+
-      '<td style="white-space:nowrap">'+
-        '<button class="btn-blue btn-sm" onclick="editTx('+Number(tx.rowIndex)+')">แก้ไข</button> '+
-        '<button class="btn-red btn-sm" onclick="deleteTx('+Number(tx.rowIndex)+')">ลบ</button>'+
+  txCache.forEach(function (tx) {
+    const tr = document.createElement('tr');
+    if (tx.pending) tr.style.opacity = '.55';
+    tr.innerHTML =
+      '<td>' + esc(tx.date) + '</td>' +
+      '<td class="num">' + fmt(tx.carry) + '</td>' +
+      '<td class="num" style="color:#059669">' + (tx.deposit ? fmt(tx.deposit) : '-') + '</td>' +
+      '<td class="num" style="color:#dc2626">' + (tx.withdraw ? fmt(tx.withdraw) : '-') + '</td>' +
+      '<td class="num" style="color:#d97706">' + (tx.transfer ? fmt(tx.transfer) : '-') + '</td>' +
+      '<td class="num"><b>' + fmt(tx.balance) + '</b></td>' +
+      '<td>' + esc(tx.by || '') + '</td>' +
+      '<td>' + esc(tx.note || '') + '</td>' +
+      '<td style="white-space:nowrap">' + (tx.pending ? '⏳ กำลังบันทึก' :
+        '<button class="btn-blue btn-sm" onclick="editTx(' + Number(tx.rowIndex) + ')">แก้ไข</button> ' +
+        '<button class="btn-red btn-sm" onclick="deleteTx(' + Number(tx.rowIndex) + ')">ลบ</button>') +
       '</td>';
     tbody.appendChild(tr);
   });
-  $('txHint').textContent=txCache.length>VISIBLE_ROWS
-    ? 'แสดง '+VISIBLE_ROWS+' รายการล่าสุด (ทั้งหมด '+txCache.length+' รายการ) · เลื่อนขึ้นเพื่อดูรายการก่อนหน้า'
-    : 'ทั้งหมด '+txCache.length+' รายการ';
+  $('txHint').textContent = txCache.length > VISIBLE_ROWS
+    ? 'แสดง ' + VISIBLE_ROWS + ' รายการล่าสุด (ทั้งหมด ' + txCache.length + ' รายการ) · เลื่อนขึ้นเพื่อดูรายการก่อนหน้า'
+    : 'ทั้งหมด ' + txCache.length + ' รายการ';
   fitTable();
 }
 
-/* ให้กล่องตารางสูงพอดี 5 แถวล่าสุด แล้วเลื่อนลงล่างสุดอัตโนมัติ */
-function fitTable(){
-  const wrap=$('tableWrap');
-  const rows=$('txBody').rows;
-  wrap.style.maxHeight='';
-  if(rows.length<=VISIBLE_ROWS||!wrap.offsetParent)return;
-  let h=wrap.querySelector('thead').offsetHeight;
-  for(let i=rows.length-VISIBLE_ROWS;i<rows.length;i++)h+=rows[i].offsetHeight;
-  wrap.style.maxHeight=(h+2)+'px';
-  wrap.scrollTop=wrap.scrollHeight;
-}
-window.addEventListener('resize',fitTable);
+function saveTransaction() {
+  if (!currentTabName) return alert('กรุณาเลือกผู้ฝากก่อน');
+  const isEdit = editingRow !== null;
+  const date = $('addDate').value;
+  const deposit = Number($('addDeposit').value) || 0;
+  const withdraw = Number($('addWithdraw').value) || 0;
+  const transfer = Number($('addTransfer').value) || 0;
+  if (!date && !isEdit) return alert('กรุณาระบุวันที่');
+  if (!deposit && !withdraw && !transfer) return alert('กรุณากรอกยอดเงินอย่างน้อย 1 ช่อง');
+  if (deposit < 0 || withdraw < 0 || transfer < 0) return alert('ยอดเงินต้องไม่ติดลบ');
 
-/* ---------- ฟอร์ม เพิ่ม/แก้ไข ---------- */
-function resetForm(keepStatus){
-  editingRow=null;
-  $('addDate').value=todayStr();
-  $('addDeposit').value='';
-  $('addWithdraw').value='';
-  $('addTransfer').value='';
-  $('addBy').value=defaultBy();
-  $('addNote').value='';
-  $('formTitle').textContent='➕ เพิ่มรายการใหม่';
-  $('saveBtn').textContent='บันทึกรายการ';
-  $('cancelEditBtn').classList.add('hidden');
-  $('formBox').classList.remove('editing');
-  if(keepStatus!==true)setStatus('');
+  const tab = currentTabName, by = $('addBy').value.trim(), note = $('addNote').value.trim();
+  const old = isEdit ? txCache.find(function (t) { return t.rowIndex === editingRow; }) : null;
+  const params = { action: isEdit ? 'updateTransaction' : 'addTransaction', tabName: tab, date: date,
+                   deposit: deposit, withdraw: withdraw, transfer: transfer, by: by, note: note, skipPdf: 1 };
+  if (isEdit) { params.rowIndex = editingRow; params.oldDate = old ? old.date : ''; }
+
+  applyLocal(isEdit ? 'edit' : 'add',
+    { date: date || (old && old.date) || todayStr(), deposit: deposit, withdraw: withdraw, transfer: transfer, by: by, note: note },
+    editingRow);
+  resetForm(true);
+  setStatus('⏳ กำลังบันทึกลงชีต...', 'info');
+  runOp(tab, params, isEdit ? '✅ แก้ไขสำเร็จ' : '✅ บันทึกสำเร็จ');
 }
 
-function editTx(rowIndex){
-  const tx=txCache.find(function(t){return t.rowIndex===rowIndex;});
-  if(!tx)return;
-  editingRow=rowIndex;
-  $('addDate').value=/^\d{4}-\d{2}-\d{2}$/.test(tx.date)?tx.date:'';
-  $('addDeposit').value=tx.deposit||'';
-  $('addWithdraw').value=tx.withdraw||'';
-  $('addTransfer').value=tx.transfer||'';
-  $('addBy').value=tx.by||'';
-  $('addNote').value=tx.note||'';
-  $('formTitle').textContent='✏️ แก้ไขรายการวันที่ '+tx.date;
-  $('saveBtn').textContent='บันทึกการแก้ไข';
-  $('cancelEditBtn').classList.remove('hidden');
-  $('formBox').classList.add('editing');
-  setStatus('');
-  $('formBox').scrollIntoView({behavior:'smooth',block:'center'});
+function deleteTx(rowIndex) {
+  const tx = txCache.find(function (t) { return t.rowIndex === rowIndex; });
+  if (!tx) return;
+  const detail = '\n\nวันที่ ' + tx.date + '\nฝาก ' + fmt(tx.deposit) + ' / ถอน ' + fmt(tx.withdraw) + ' / โอน ' + fmt(tx.transfer);
+  if (!confirm('ยืนยันการลบรายการนี้?' + detail + '\n\nลบแล้วกู้คืนจากหน้านี้ไม่ได้ และยอดคงเหลือของรายการถัดไปจะถูกคำนวณใหม่')) return;
+  const tab = currentTabName;
+  applyLocal('delete', null, rowIndex);
+  if (editingRow === rowIndex) resetForm(true);
+  setStatus('⏳ กำลังลบ...', 'info');
+  runOp(tab, { action: 'deleteTransaction', tabName: tab, rowIndex: rowIndex, oldDate: tx.date, skipPdf: 1 }, '🗑️ ลบรายการแล้ว');
 }
-
-async function saveTransaction(){
-  if(busy)return;
-  if(!currentTabName)return alert('กรุณาเลือกผู้ฝากก่อน');
-  const isEdit=editingRow!==null;
-  const date=$('addDate').value;
-  const deposit=Number($('addDeposit').value)||0;
-  const withdraw=Number($('addWithdraw').value)||0;
-  const transfer=Number($('addTransfer').value)||0;
-  if(!date&&!isEdit)return alert('กรุณาระบุวันที่');
-  if(!deposit&&!withdraw&&!transfer)return alert('กรุณากรอกยอดเงินอย่างน้อย 1 ช่อง');
-  if(deposit<0||withdraw<0||transfer<0)return alert('ยอดเงินต้องไม่ติดลบ');
-
-  const tab=currentTabName;
-  const params={
-    action:isEdit?'updateTransaction':'addTransaction',
-    tabName:tab,date:date,deposit:deposit,withdraw:withdraw,transfer:transfer,
-    by:$('addBy').value.trim(),note:$('addNote').value.trim(),skipPdf:1
-  };
-  if(isEdit)params.rowIndex=editingRow;
-
-  busy=true;
-  $('saveBtn').disabled=true;
-  setStatus('กำลังบันทึก...','info');
-  try{
-    const json=await api(params,90000);
-    if(!json.ok)throw new Error(json.error||'บันทึกไม่สำเร็จ');
-    const msg=isEdit?'✅ แก้ไขสำเร็จ':'✅ บันทึกสำเร็จ';
-    resetForm(true);
-    await loadTransactions();
-    refreshPdf(tab,msg);
-  }catch(e){
-    setStatus('❌ '+e.message,'err');
-  }finally{
-    busy=false;
-    $('saveBtn').disabled=false;
-  }
-}
-
-async function deleteTx(rowIndex){
-  if(busy)return;
-  const tx=txCache.find(function(t){return t.rowIndex===rowIndex;});
-  const detail=tx?('\n\nวันที่ '+tx.date+'\nฝาก '+fmt(tx.deposit)+' / ถอน '+fmt(tx.withdraw)+' / โอน '+fmt(tx.transfer)):'';
-  if(!confirm('ยืนยันการลบรายการนี้?'+detail+'\n\nลบแล้วกู้คืนจากหน้านี้ไม่ได้ และยอดคงเหลือของรายการถัดไปจะถูกคำนวณใหม่'))return;
-
-  const tab=currentTabName;
-  busy=true;
-  setStatus('กำลังลบ...','info');
-  try{
-    const json=await api({action:'deleteTransaction',tabName:tab,rowIndex:rowIndex,skipPdf:1},90000);
-    if(!json.ok)throw new Error(json.error||'ลบไม่สำเร็จ');
-    if(editingRow!==null)resetForm(true);
-    await loadTransactions();
-    refreshPdf(tab,'🗑️ ลบรายการแล้ว');
-  }catch(e){
-    setStatus('','');
-    alert('ลบไม่สำเร็จ: '+e.message);
-  }finally{
-    busy=false;
-  }
-}
-
-/* อัปเดต PDF เบื้องหลังหลังบันทึก/แก้ไข/ลบ (ไม่ต้องรอ) */
-function refreshPdf(tab,prefix){
-  const job=++pdfJob;
-  setStatus(prefix+' · กำลังอัปเดต PDF...','info');
-  api({action:'regeneratePdf',tabName:tab},180000).then(function(j){
-    if(job!==pdfJob)return;
-    if(j.ok)setStatus(prefix+' · อัปเดต PDF แล้ว','ok');
-    else setStatus(prefix+' · แต่อัปเดต PDF ไม่สำเร็จ ('+(j.error||'')+')','err');
-  }).catch(function(e){
-    if(job===pdfJob)setStatus(prefix+' · แต่อัปเดต PDF ไม่สำเร็จ ('+e.message+')','err');
-  });
-}
-
-async function regeneratePdf(){
-  if(busy||!currentTabName)return;
-  busy=true;
-  const btn=$('pdfBtn');
-  const old=btn.textContent;
-  btn.disabled=true;
-  btn.textContent='⏳ กำลังอัปเดต PDF...';
-  try{
-    const json=await api({action:'regeneratePdf',tabName:currentTabName},180000);
-    if(!json.ok)throw new Error(json.error||'');
-    alert('✅ อัปเดต PDF เรียบร้อยแล้ว');
-  }catch(e){
-    alert('อัปเดต PDF ไม่สำเร็จ: '+e.message);
-  }finally{
-    busy=false;
-    btn.disabled=false;
-    btn.textContent=old;
-  }
-}
-
-async function syncTabs(){
-  if(busy)return;
-  busy=true;
-  const btn=$('syncBtn');
-  const old=btn.textContent;
-  btn.disabled=true;
-  btn.textContent='⏳ กำลัง Sync (อาจใช้เวลา 1-2 นาที)...';
-  try{
-    const json=await api({action:'syncNow'},300000);
-    if(!json.ok)throw new Error(json.error||'');
-    await reloadReceivers();
-    alert('✅ Sync ข้อมูลแท็บใหม่เรียบร้อยแล้ว');
-  }catch(e){
-    alert('Sync ไม่สำเร็จ: '+e.message);
-  }finally{
-    busy=false;
-    btn.disabled=false;
-    btn.textContent=old;
-  }
-}
-
-window.addEventListener('DOMContentLoaded',function(){
-  let saved=null;
-  try{saved=localStorage.getItem('admin_pass');}catch(e){}
-  if(saved){$('adminPassword').value=saved;login();}
-});
-</script>
-</body>
-</html>
