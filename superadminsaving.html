@@ -87,6 +87,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">
         <h2 id="txTitle" style="margin-bottom:0">รายการเดินบัญชี</h2>
         <div>
+          <span id="liveStamp" class="hint" style="margin-right:8px"></span>
           <button class="btn-gray" style="margin-right:8px" onclick="loadTransactions()">🔄 โหลดใหม่</button>
           <button id="pdfBtn" class="btn-blue" onclick="regeneratePdf()">📄 อัปเดต PDF ทันที</button>
         </div>
@@ -254,6 +255,7 @@ async function login(){
     show('adminView');
     populateReceivers();
     onReceiverChange();
+    startPolling();
   }catch(e){
     $('loginError').textContent=e.message;
   }
@@ -262,6 +264,7 @@ async function login(){
 function logout(){
   clearLogin();
   adminPassword='';
+  stopPolling();
   currentTabName='';
   show('loginView');
   $('adminPassword').value='';
@@ -338,7 +341,10 @@ function onStudentChange(){
 async function reloadReceivers(){
   const data=await api({action:'getReceivers'},90000);
   if(!data.ok)throw new Error(data.error||'โหลดรายชื่อไม่สำเร็จ');
-  receiverData=data.data;
+  applyReceivers(data.data);
+}
+function applyReceivers(d){
+  receiverData=d;
   const prevR=$('receiverSelect').value;
   const prevS=$('studentSelect').value;
   populateReceivers();
@@ -358,23 +364,28 @@ async function reloadReceivers(){
 }
 
 /* ---------- โหลด/แสดงรายการ ---------- */
-async function loadTransactions(){
+let loadingNow=false, loadingTab='';
+async function loadTransactions(silent){
   const tabName=currentTabName;
-  if(!tabName)return;
-  lastLoad=Date.now();
+  if(!tabName||(loadingNow&&loadingTab===tabName))return;   // กันยิงซ้อนของแท็บเดียวกัน
+  loadingNow=true;loadingTab=tabName;
   if(!txStore[tabName])$('txHint').textContent='กำลังโหลดรายการ...';
   try{
     const data=await api({action:'getTransactions',tabName:tabName},90000);
     if(tabName!==currentTabName||pendingOps)return;   // ระหว่างมีงานค้างในคิว ใช้ผลจากคิวแทน
     if(!data.ok)throw new Error(data.error||'ไม่ทราบสาเหตุ');
-    txStore[tabName]=data.data||[];
-    txCache=clone(txStore[tabName]);
-    renderTransactions();
+    const rows=data.data||[];
+    const changed=JSON.stringify(rows)!==JSON.stringify(txStore[tabName]);
+    txStore[tabName]=rows;
+    $('liveStamp').textContent='หน้าเว็บ v5 · อัปเดตล่าสุด '+new Date().toLocaleTimeString('th-TH');
+    if(changed){txCache=clone(rows);renderTransactions();}   // เปลี่ยนเมื่อข้อมูลในชีตต่างจากที่แสดงเท่านั้น
   }catch(e){
-    if(tabName===currentTabName){
+    if(!silent&&tabName===currentTabName){
       $('txHint').textContent='';
       alert('โหลดข้อมูลไม่สำเร็จ: '+e.message);
     }
+  }finally{
+    if(loadingTab===tabName)loadingNow=false;
   }
 }
 
@@ -525,17 +536,34 @@ function firePdf(tab){
     if(tab===currentTabName&&!pendingOps)setStatus('⚠️ บันทึกแล้ว แต่อัปเดต PDF ไม่สำเร็จ ('+e.message+')','err');
   });
 }
-let lastLoad=0;
-/* กลับมาที่หน้านี้ -> โหลดข้อมูลล่าสุดจากชีตเงียบๆ (เผื่อมีการแก้/ลบในชีตโดยตรง) */
+/* ---- ดึงข้อมูลจากชีตเองเป็นระยะ: แก้/ลบ/เพิ่มในชีตโดยตรงแล้วหน้านี้เปลี่ยนตามภายในไม่กี่วินาที ---- */
+const POLL_MS=8000, RECV_POLL_MS=60000;
+let txPoll=null, rcPoll=null, recvLoading=false;
 function refreshIfIdle(){
-  if(!currentTabName||pendingOps||busy||editingRow!==null||Date.now()-lastLoad<3000)return;
-  loadTransactions();
+  if(!currentTabName||pendingOps||busy||editingRow!==null||document.hidden)return;
+  loadTransactions(true);
 }
+async function refreshReceivers(){
+  if(recvLoading||!adminPassword||busy||document.hidden)return;
+  const ae=document.activeElement;
+  if(ae&&(ae.id==='receiverSelect'||ae.id==='studentSelect'))return;   // กำลังเลือกอยู่ ไม่รบกวน
+  recvLoading=true;
+  try{
+    const data=await api({action:'getReceivers'},90000);
+    if(data.ok&&JSON.stringify(data.data)!==JSON.stringify(receiverData))applyReceivers(data.data);
+  }catch(e){}finally{recvLoading=false;}
+}
+function startPolling(){
+  stopPolling();
+  txPoll=setInterval(refreshIfIdle,POLL_MS);
+  rcPoll=setInterval(refreshReceivers,RECV_POLL_MS);
+}
+function stopPolling(){clearInterval(txPoll);clearInterval(rcPoll);}
 document.addEventListener('visibilitychange',function(){
   if(document.hidden)Object.keys(pdfTimers).forEach(function(t){firePdf(t);});
-  else refreshIfIdle();
+  else{refreshIfIdle();refreshReceivers();}
 });
-window.addEventListener('focus',refreshIfIdle);
+window.addEventListener('focus',function(){refreshIfIdle();refreshReceivers();});
 window.addEventListener('beforeunload',function(e){
   if(pendingOps){e.preventDefault();e.returnValue='';}
 });
