@@ -87,6 +87,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">
         <h2 id="txTitle" style="margin-bottom:0">รายการเดินบัญชี</h2>
         <div>
+          <button class="btn-gray" style="margin-right:8px" onclick="loadTransactions()">🔄 โหลดใหม่</button>
           <button id="pdfBtn" class="btn-blue" onclick="regeneratePdf()">📄 อัปเดต PDF ทันที</button>
         </div>
       </div>
@@ -360,6 +361,7 @@ async function reloadReceivers(){
 async function loadTransactions(){
   const tabName=currentTabName;
   if(!tabName)return;
+  lastLoad=Date.now();
   if(!txStore[tabName])$('txHint').textContent='กำลังโหลดรายการ...';
   try{
     const data=await api({action:'getTransactions',tabName:tabName},90000);
@@ -523,9 +525,17 @@ function firePdf(tab){
     if(tab===currentTabName&&!pendingOps)setStatus('⚠️ บันทึกแล้ว แต่อัปเดต PDF ไม่สำเร็จ ('+e.message+')','err');
   });
 }
+let lastLoad=0;
+/* กลับมาที่หน้านี้ -> โหลดข้อมูลล่าสุดจากชีตเงียบๆ (เผื่อมีการแก้/ลบในชีตโดยตรง) */
+function refreshIfIdle(){
+  if(!currentTabName||pendingOps||busy||editingRow!==null||Date.now()-lastLoad<3000)return;
+  loadTransactions();
+}
 document.addEventListener('visibilitychange',function(){
   if(document.hidden)Object.keys(pdfTimers).forEach(function(t){firePdf(t);});
+  else refreshIfIdle();
 });
+window.addEventListener('focus',refreshIfIdle);
 window.addEventListener('beforeunload',function(e){
   if(pendingOps){e.preventDefault();e.returnValue='';}
 });
