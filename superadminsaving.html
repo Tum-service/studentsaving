@@ -47,6 +47,9 @@
   .status-err{background:#fee2e2;color:#991b1b}
   .status-info{background:#e0f2fe;color:#075985}
   html{-webkit-text-size-adjust:100%}
+  .only-m{display:none}
+  .d-short{display:none}
+  .btn-sm .i{display:none}
   input,select{min-width:0;max-width:100%}
   .form-group>div,.pick-row>div{min-width:0}
   @media (max-width:700px){
@@ -66,26 +69,20 @@
     .form-group>div:nth-child(1),.form-group>div:nth-child(5),.form-group>div:nth-child(6){grid-column:1/-1}
     label.lbl{font-size:.75rem}
     #saveBtn{flex:1}
-    /* ตาราง -> การ์ดทีละรายการ */
-    .table-wrap{border:none;overflow-y:auto;overflow-x:hidden}
-    table,tbody,tr,td{display:block;width:100%}
-    thead{display:none}
-    tr{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 8px;border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin-bottom:10px;background:#fff}
-    td{border:none;padding:0;font-size:.95rem;word-break:break-word}
-    td::before{content:attr(data-l);display:block;font-size:.7rem;color:#64748b}
-    td:nth-child(1){grid-area:1/1/2/3;font-weight:700}
-    td:nth-child(6){grid-area:1/3/2/5;text-align:right;font-size:1.1rem}
-    td:nth-child(2){grid-area:2/1/3/2}
-    td:nth-child(3){grid-area:2/2/3/3}
-    td:nth-child(4){grid-area:2/3/3/4}
-    td:nth-child(5){grid-area:2/4/3/5}
-    td:nth-child(7){grid-area:3/1/4/3}
-    td:nth-child(8){grid-area:3/3/4/5}
-    td:nth-child(9){grid-area:4/1/5/5;display:flex;gap:8px}
-    td:nth-child(9)::before{display:none}
-    td:nth-child(9) button{flex:1}
-    td.empty{grid-area:1/1/2/5!important;text-align:center}
-    .btn-sm{padding:8px 12px;font-size:.9rem}
+    /* ตารางกะทัดรัดสำหรับมือถือ (ไม่มีกรอบเลื่อนซ้อน) */
+    .only-m{display:flex}
+    .table-wrap{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;max-height:none!important}
+    table{font-size:.72rem}
+    th,td{padding:7px 3px;white-space:nowrap;font-size:.72rem}
+    th{position:static}
+    .num{text-align:right}
+    .c-carry,.c-by,.c-note{display:none}
+    .d-full{display:none}.d-short{display:inline}
+    .table-wrap.full .c-carry,.table-wrap.full .c-by,.table-wrap.full .c-note{display:table-cell}
+    .table-wrap.full .d-full{display:inline}.table-wrap.full .d-short{display:none}
+    .acts{display:flex;gap:4px}
+    .btn-sm .t{display:none}.btn-sm .i{display:inline}
+    .btn-sm{padding:6px 8px;min-height:32px;font-size:.85rem}
   }
 </style>
 </head>
@@ -166,18 +163,22 @@
       </div>
 
       <p id="txHint" class="hint"></p>
+      <div class="only-m" style="gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <button id="moreBtn" class="btn-gray btn-sm hidden" onclick="showMore()"></button>
+        <button id="colsBtn" class="btn-gray btn-sm" onclick="toggleCols()">↔ ดูคอลัมน์ทั้งหมด</button>
+      </div>
       <div id="tableWrap" class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>วันที่</th>
-              <th class="num">ยอดยกมา</th>
+              <th class="c-date">วันที่</th>
+              <th class="num c-carry">ยอดยกมา</th>
               <th class="num">ฝาก</th>
               <th class="num">ถอน</th>
               <th class="num">โอน</th>
               <th class="num">คงเหลือ</th>
-              <th>ผู้รับฝาก</th>
-              <th>หมายเหตุ</th>
+              <th class="c-by">ผู้รับฝาก</th>
+              <th class="c-note">หมายเหตุ</th>
               <th>จัดการ</th>
             </tr>
           </thead>
@@ -190,7 +191,14 @@
 
 <script>
 const MASTER_API = 'https://script.google.com/macros/s/AKfycbwUEz0s2i9SQQ6hWVUpg0mIr8Oq-4ckJxhYR_vuy5sVwG6tyBMiMsQhu2ki03F3ceF3/exec';
-function visRows(){return window.matchMedia&&window.matchMedia('(max-width:700px)').matches?3:5;}   // จำนวนรายการล่าสุดที่โชว์ (มือถือ 3 / คอม 5)
+function isMobile(){return !!(window.matchMedia&&window.matchMedia('(max-width:700px)').matches);}
+function visRows(){return 5;}          // คอมพิวเตอร์: โชว์ 5 รายการล่าสุดในกรอบ (มือถือไม่มีกรอบเลื่อนซ้อน)
+let shownMax=10;                       // มือถือ: โชว์กี่รายการล่าสุด กด "ดูรายการก่อนหน้า" เพื่อเพิ่ม
+function showMore(){shownMax+=15;renderTransactions();}
+function toggleCols(){
+  const w=$('tableWrap');w.classList.toggle('full');
+  $('colsBtn').textContent=w.classList.contains('full')?'↔ ซ่อนคอลัมน์':'↔ ดูคอลัมน์ทั้งหมด';
+}
 const UNASSIGNED = '__unassigned__';
 
 let adminPassword = '';
@@ -362,6 +370,7 @@ function onStudentChange(){
     return;
   }
   currentTabName=tab;
+  shownMax=10;
   txCache=clone(txStore[tab]);                    // แสดงจากแคชทันที แล้วค่อยรีเฟรชเบื้องหลัง
   $('txSection').classList.remove('hidden');
   $('txTitle').textContent='รายการเดินบัญชี: '+tab;
@@ -409,7 +418,7 @@ async function loadTransactions(silent){
     const rows=data.data||[];
     const changed=JSON.stringify(rows)!==JSON.stringify(txStore[tabName]);
     txStore[tabName]=rows;
-    $('liveStamp').textContent='v6 · อัปเดตล่าสุด '+new Date().toLocaleTimeString('th-TH');
+    $('liveStamp').textContent='v7 · อัปเดตล่าสุด '+new Date().toLocaleTimeString('th-TH');
     if(changed){txCache=clone(rows);renderTransactions();}   // เปลี่ยนเมื่อข้อมูลในชีตต่างจากที่แสดงเท่านั้น
   }catch(e){
     if(!silent&&tabName===currentTabName){
@@ -430,27 +439,34 @@ function renderTransactions(){
     fitTable();
     return;
   }
-  txCache.forEach(function(tx){
+  const mob=isMobile();
+  const list=mob?txCache.slice(-shownMax):txCache;
+  const more=mob?txCache.length-list.length:0;
+  $('moreBtn').classList.toggle('hidden',!more);
+  if(more)$('moreBtn').textContent='⬆ ดูรายการก่อนหน้า (อีก '+more+' รายการ)';
+  list.forEach(function(tx){
     const tr=document.createElement('tr');
     if(tx.pending)tr.style.opacity='.55';
     tr.innerHTML=
-      '<td data-l="วันที่">'+esc(tx.date)+'</td>'+
-      '<td class="num" data-l="ยอดยกมา">'+fmt(tx.carry)+'</td>'+
-      '<td class="num" data-l="ฝาก" style="color:#059669">'+(tx.deposit?fmt(tx.deposit):'-')+'</td>'+
-      '<td class="num" data-l="ถอน" style="color:#dc2626">'+(tx.withdraw?fmt(tx.withdraw):'-')+'</td>'+
-      '<td class="num" data-l="โอน" style="color:#d97706">'+(tx.transfer?fmt(tx.transfer):'-')+'</td>'+
-      '<td class="num" data-l="คงเหลือ"><b>'+fmt(tx.balance)+'</b></td>'+
-      '<td data-l="ผู้รับฝาก">'+esc(tx.by||'')+'</td>'+
-      '<td data-l="หมายเหตุ">'+esc(tx.note||'')+'</td>'+
-      '<td style="white-space:nowrap">'+(tx.pending?'⏳ กำลังบันทึก':
-        '<button class="btn-blue btn-sm" onclick="editTx('+Number(tx.rowIndex)+')">แก้ไข</button> '+
-        '<button class="btn-red btn-sm" onclick="deleteTx('+Number(tx.rowIndex)+')">ลบ</button>')+
+      '<td class="c-date" title="'+esc(tx.date)+'"><span class="d-full">'+esc(tx.date)+'</span><span class="d-short">'+esc(shortDate(tx.date))+'</span></td>'+
+      '<td class="num c-carry">'+fmt(tx.carry)+'</td>'+
+      '<td class="num" style="color:#059669">'+(tx.deposit?fmt(tx.deposit):'-')+'</td>'+
+      '<td class="num" style="color:#dc2626">'+(tx.withdraw?fmt(tx.withdraw):'-')+'</td>'+
+      '<td class="num" style="color:#d97706">'+(tx.transfer?fmt(tx.transfer):'-')+'</td>'+
+      '<td class="num"><b>'+fmt(tx.balance)+'</b></td>'+
+      '<td class="c-by">'+esc(tx.by||'')+'</td>'+
+      '<td class="c-note">'+esc(tx.note||'')+'</td>'+
+      '<td style="white-space:nowrap">'+(tx.pending?'⏳':
+        '<div class="acts"><button class="btn-blue btn-sm" aria-label="แก้ไข" onclick="editTx('+Number(tx.rowIndex)+')"><span class="t">แก้ไข</span><span class="i">✏️</span></button> '+
+        '<button class="btn-red btn-sm" aria-label="ลบ" onclick="deleteTx('+Number(tx.rowIndex)+')"><span class="t">ลบ</span><span class="i">🗑️</span></button></div>')+
       '</td>';
     tbody.appendChild(tr);
   });
-  $('txHint').textContent=txCache.length>visRows()
-    ? 'แสดง '+visRows()+' รายการล่าสุด (ทั้งหมด '+txCache.length+' รายการ) · เลื่อนขึ้นเพื่อดูรายการก่อนหน้า'
-    : 'ทั้งหมด '+txCache.length+' รายการ';
+  $('txHint').textContent=mob
+    ? 'แสดง '+list.length+' รายการล่าสุด (ทั้งหมด '+txCache.length+' รายการ)'
+    : (txCache.length>visRows()
+        ? 'แสดง '+visRows()+' รายการล่าสุด (ทั้งหมด '+txCache.length+' รายการ) · เลื่อนขึ้นเพื่อดูรายการก่อนหน้า'
+        : 'ทั้งหมด '+txCache.length+' รายการ');
   fitTable();
 }
 
@@ -459,6 +475,7 @@ function fitTable(){
   const wrap=$('tableWrap');
   const rows=$('txBody').rows;
   wrap.style.maxHeight='';
+  if(isMobile())return;                 // มือถือ: ไม่ใช้กรอบเลื่อนซ้อน ให้เลื่อนทั้งหน้าตามปกติ
   const n=visRows();
   if(rows.length<=n||!wrap.offsetParent)return;
   const first=rows[rows.length-n],last=rows[rows.length-1];
@@ -468,6 +485,8 @@ function fitTable(){
   wrap.scrollTop=wrap.scrollHeight;
 }
 window.addEventListener('resize',fitTable);
+if(window.matchMedia){const mq=window.matchMedia('(max-width:700px)');(mq.addEventListener?mq.addEventListener('change',function(){renderTransactions();}):mq.addListener(function(){renderTransactions();}));}
+function shortDate(d){const m=/^\d{4}-(\d{2})-(\d{2})$/.exec(d||'');return m?m[2]+'/'+m[1]:d;}
 
 /* ---------- ฟอร์ม เพิ่ม/แก้ไข ---------- */
 function resetForm(keepStatus){
